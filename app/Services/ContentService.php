@@ -565,6 +565,24 @@ class ContentService
         }, ['content:contact']);
     }
 
+    /**
+     * A published CMS page (type=page) by slug — used for /privacy, /terms, and
+     * any other static page whose body is CMS-managed. Cached; null when absent.
+     */
+    public function getPage(string $slug): ?Content
+    {
+        $key = $this->makeCacheKey('page_by_slug', ['slug' => $slug]);
+
+        return $this->remember($key, now()->addHours(12), function () use ($slug) {
+            return Content::query()
+                ->published()
+                ->where('type', 'page')
+                ->where('slug', $slug)
+                ->with(['seoMetadata', 'images'])
+                ->first();
+        }, ['content:page']);
+    }
+
     public function getPublishedServicesList(): Collection
     {
         $key = $this->makeCacheKey('services_list_contact', []);

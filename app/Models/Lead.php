@@ -134,11 +134,13 @@ class Lead extends Model
         return $query->whereNotNull('source_content_id');
     }
 
-    /** Leads with service/portfolio intent + known source = higher conversion potential */
+    /** Leads with service/portfolio intent + a known content link = higher conversion potential */
     public function scopeHighIntent(Builder $query): Builder
     {
         return $query->whereNotIn('inquiry_type', ['general', 'newsletter'])
-            ->whereNotNull('source_content_id')
+            ->where(fn (Builder $q) => $q
+                ->whereNotNull('source_content_id')
+                ->orWhereNotNull('service_content_id'))
             ->where('is_spam', false);
     }
 
@@ -154,7 +156,7 @@ class Lead extends Model
     public function getIsHighIntentAttribute(): bool
     {
         return ! in_array($this->inquiry_type, ['general', 'newsletter'], true)
-            && $this->source_content_id !== null
+            && ($this->source_content_id !== null || $this->service_content_id !== null)
             && ! $this->is_spam;
     }
 

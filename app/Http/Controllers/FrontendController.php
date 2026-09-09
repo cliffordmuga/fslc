@@ -225,13 +225,8 @@ class FrontendController extends Controller
 
     public function privacy()
     {
-        // Try CMS-managed page first: type=page, slug=privacy
-        $content = Content::query()
-            ->published()
-            ->where('type', 'page')
-            ->where('slug', 'privacy')
-            ->with(['seoMetadata', 'images'])
-            ->first();
+        // CMS-managed page when present (type=page, slug=privacy), else static copy.
+        $content = $this->contentService->getPage('privacy');
 
         // SEO: prefer CMS (if found), else default SEO for privacy
         $seoData = $this->contentService->getSeoData('privacy', $content);
@@ -247,13 +242,8 @@ class FrontendController extends Controller
 
     public function terms()
     {
-        // Try CMS-managed page first: type=page, slug=terms
-        $content = Content::query()
-            ->published()
-            ->where('type', 'page')
-            ->where('slug', 'terms')
-            ->with(['seoMetadata', 'images'])
-            ->first();
+        // CMS-managed page when present (type=page, slug=terms), else static copy.
+        $content = $this->contentService->getPage('terms');
 
         $seoData = $this->contentService->getSeoData('terms', $content);
         $seoData['canonical_url'] = url('/terms');
@@ -331,16 +321,8 @@ class FrontendController extends Controller
      */
     public function previewContent(Content $content)
     {
-        $content = Content::query()
-            ->with([
-                'tags',
-                'ctas',
-                'seoMetadata',
-                'testimonials',
-                'creator',
-                'images',
-            ])
-            ->findOrFail($content->id);
+        // Draft preview — intentionally uncached; just eager-load for the view.
+        $content->load(['tags', 'ctas', 'seoMetadata', 'testimonials', 'creator', 'images']);
 
         $type = $content->type;
         $relatedItems = collect();

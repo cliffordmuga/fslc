@@ -26,7 +26,10 @@ class ContentController extends Controller
 
     public function index(Request $request): View
     {
-        $query = Content::with(['creator', 'images' => fn ($q) => $q->where('collection', 'featured')])
+        $query = Content::with(['creator', 'images' => fn ($q) => $q
+            ->where('collection', 'featured')
+            ->whereIn('variant', ['thumbnail', 'main'])
+            ->orderByDesc('variant')]) // 'thumbnail' before 'main' — list shows the smallest
             ->when($request->type, fn ($q) => $q->where('type', $request->type))
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->search, fn ($q) => $q->where('title', 'like', "%{$request->search}%"))
