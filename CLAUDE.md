@@ -58,15 +58,21 @@ Laravel 12 slim skeleton — there is **no `app/Http/Kernel.php`**. All global m
 
 1. **Prepended:** `ForceHttps` → `HandleRedirects` (redirects resolve before anything else)
 2. route handling
-3. **Appended:** `SecurityHeaders` (CSP etc.), then `PublicPageCache`, then `TrackPageViews`
+3. **Appended:** `SecurityHeaders` (CSP etc.), then `PublicPageCache`, then `TrackPageViews` (records in `terminate()`, so it counts cache HITs and never blocks the response)
 
 Aliases: `2fa` (`Verify2FA`), `admin.2fa` (`RequireAdminTwoFactor`), `role` (`CheckRole`), `page.cache`. CSRF is disabled for `csp-report`, `api/cta/click`, `lead-events`.
 
 ### Content model — one polymorphic table
 
-`Content` (`contents` table) holds every content kind, discriminated by a `type` string column: `portfolio`, `services`, `page`, `about`, `mission`, `vision`, `intro`, `blog`, `timeline_item`, `faq_item`. Status is `draft` / `published` gated by `published_at <= now()` (`scopePublished`). `booted()` auto-generates a unique slug and an excerpt on create/update. `Content::getUrlAttribute` maps `type` → route name via `config('routes.content_types')` and caches the result.
+`Content` (`contents` table) holds every content kind, discriminated by a `type` string column. Status is `draft` / `published` gated by `published_at <= now()` (`scopePublished`). `booted()` auto-generates a unique slug and an excerpt on create/update. `Content::getUrlAttribute` maps `type` → route name via `config('routes.content_types')` and caches the result.
 
-`ContentType` enum exists but only covers the public-facing subset; `Content::TYPES` is the full list. When adding a type, update: the enum (if public), `Content::TYPES`, `config/routes.php`, `routes/web.php`, and `ContentObserver::pathFor()`.
+The **`App\Enums\ContentType` enum is the single source of truth** for content types: `portfolio`, `services`, `page`, `about`, `mission`, `vision`, `intro`, `blog`, plus the *fragment* types `timeline_item` / `faq_item` (embedded on hub pages, no public detail URL). It provides:
+
+- `labels()` — admin-dropdown labels; `Content::typeLabels()` delegates here (there is no longer a `Content::TYPES` constant).
+- `isFragment()` — true for `timeline_item` / `faq_item`.
+- `detailPath($slug)` / `redirectPathFor($type, $slug)` — public path for a type, `null` for fragments; used by `ContentObserver` to build 301s on slug change.
+
+When adding a type: add the enum case + a `labels()` entry, then wire `config/routes.php` and `routes/web.php` if it has a public URL.
 
 ### Caching (multi-layer — the core complexity of this codebase)
 
@@ -79,7 +85,7 @@ Aliases: `2fa` (`Verify2FA`), `admin.2fa` (`RequireAdminTwoFactor`), `role` (`Ch
 | Admin sidebar / dashboard | `App\Support\AdminUiCache` | Explicit `forget*` calls from observers. |
 | Global buster | `App\Services\CacheBuster` | `bump()` invalidates full-page **and** content-fragment caches at once. `cache:bust-content` and `ContentObserver` call into this. |
 
-`ContentObserver::saved()` busts content cache, refreshes admin option caches, and dispatches `RegenerateSitemapJob` when the item is published. `ContentObserver::updating()` auto-creates a 301 `Redirect` row when a slug changes.
+`ContentObserver::saved()` busts content cache, refreshes admin option caches, and dispatches `RegenerateSitemapJob` when the item is published. `ContentObserver::updating()` auto-creates a 301 `Redirect` row when a slug changes (path from `ContentType::redirectPathFor()`; fragment types are skipped).
 
 When adding a cached read, register its key/tag so an observer or trait clears it — stale content after an admin edit is the usual bug.
 
@@ -89,7 +95,11 @@ When adding a cached read, register its key/tag so an observer or trait clears i
 
 ### SEO
 
-`SeoMetadata` attaches to any model via `Seoable` (`morphOne`). `SeoService` builds meta/OG/JSON-LD; `SeoScoreService` + `App\View\Components\Admin\SeoScore` show an editor score. `ContentService::getPageSchemas()` / `getSeoData()` produce per-page-type structured data and copy (heavily Kenya/HMIS-specific — treat the hardcoded strings there as content, not config). Sitemap: Spatie sitemap + `SitemapService`; `GET /sitemap.xml` self-heals if missing/outdated; `RegenerateSitemapJob` on content changes; daily schedule.
+`SeoMetadata` attaches to any model via `Seoable` (`morphOne`). `SeoService` builds meta/OG/JSON-LD; `SeoScoreService` + `App\View\Components\Admin\SeoScore` show an editor score.
+
+`PageSeoService` owns per-page-type structured data, canonical URLs, and copy (heavily Kenya/HMIS-specific — treat the hardcoded strings there as content, not config). `ContentService` keeps thin delegating wrappers — `getSeoData()`, `getPageSchemas()`, `getTagSeoData()`, `applyPaginatedHubSeo()`, `applyFilteredHubSeo()` — so controllers call `ContentService` as before.
+
+Sitemap: Spatie sitemap + `SitemapService`, served through `SitemapController` (`xml` / `html` / admin `generate`). `GET /sitemap.xml` self-heals if missing/outdated; `RegenerateSitemapJob` fires on content changes; daily schedule. The generated `public/sitemap.xml` is gitignored.
 
 ### Leads & funnel
 
@@ -110,4 +120,5 @@ Breeze + optional Socialite (gated by `config('features.social_login_enabled')` 
 - **Activity log**: Spatie `LogsActivity` on `Content`, `User`, and others; `ActivityLogController` + cached recent-activity in the admin sidebar.
 - **Config lives in custom files**: `config/forefront.php` (portfolio pillars, per-service lead config, tag hub intros, inquiry UX copy), `config/public_page_cache.php`, `config/seo.php`, `config/image.php`, `config/uploads.php`, `config/security.php` (CSP), `config/features.php`.
 - **CSP**: `SecurityHeaders` middleware emits the policy; browsers post violations to `POST /csp-report` → `CspReportController`; review with `php artisan csp:status`.
-- Tests use sqlite `:memory:`, `array` cache, `sync` queue, `array` mail (`phpunit.xml`). The `*RefinementTest` / `*RemediationTest` feature tests are regression guards for specific past fixes — run the relevant one after touching frontend pages, SEO, or uploads.
+- Tests use sqlite `:memory:`, `array` cache, `sync` queue, `array` mail (`phpunit.xml`). The `*RefinementTest` / `*RemediationTest` feature tests are regression guards for specific past fixes — run the relevant one after touching frontend pages, SEO, or uploads. `tests/Unit` covers the pure logic (`ContentType`, `ContentCacheManager`, `PageSeoService`, `LeadSpamService`, image cache keys).
+- **Watch the `date` cast on `PageAnalytic`**: it persists as `Y-m-d 00:00:00`, so `where('date', $ymd)` only matches on MySQL (real `DATE` column). Use `whereDate()` for lookups and increment on the model instance — see `TrackPageViews`. `ContactController::trackConversion()` still uses the fragile pattern.
