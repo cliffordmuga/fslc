@@ -5,7 +5,6 @@ namespace App\Http\Middleware;
 use App\Models\Content;
 use App\Models\PageAnalytic;
 use Closure;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
@@ -57,13 +56,10 @@ class TrackPageViews
         try {
             $today = now()->toDateString();
 
-            // whereDate() (not where('date', ...)) because PageAnalytic casts
-            // `date`, which persists as "Y-m-d 00:00:00" — a bare Y-m-d string
-            // never matches on SQLite.
-            $row = $this->dailyRow($contentId, $today);
+            $row = PageAnalytic::forDay($contentId, $today);
             $row->increment('views');
 
-            $visitorKey = 'pv:' . md5($request->ip() . '|' . ($request->userAgent() ?? '') . '|' . $contentId . '|' . $today);
+            $visitorKey = 'pv:'.md5($request->ip().'|'.($request->userAgent() ?? '').'|'.$contentId.'|'.$today);
 
             if (! Cache::has($visitorKey)) {
                 Cache::put($visitorKey, true, now()->endOfDay());
@@ -71,35 +67,6 @@ class TrackPageViews
             }
         } catch (\Throwable $e) {
             report($e);
-        }
-    }
-
-    /**
-     * The page_analytics row for this content + day, created if missing.
-     * Retries once on a concurrent-insert race.
-     */
-    protected function dailyRow(int $contentId, string $date): PageAnalytic
-    {
-        $find = fn () => PageAnalytic::query()
-            ->where('content_id', $contentId)
-            ->whereDate('date', $date)
-            ->first();
-
-        if ($row = $find()) {
-            return $row;
-        }
-
-        try {
-            return PageAnalytic::create([
-                'content_id' => $contentId,
-                'date' => $date,
-                'views' => 0,
-                'unique_visitors' => 0,
-                'cta_clicks' => 0,
-                'leads_generated' => 0,
-            ]);
-        } catch (UniqueConstraintViolationException $e) {
-            return $find() ?? throw $e;
         }
     }
 
@@ -133,7 +100,7 @@ class TrackPageViews
 
         // Cache the route+slug -> id mapping so cached page views don't each
         // cost a DB lookup. Misses are cached as 0 to avoid re-querying.
-        $cacheKey = 'pv:content-id:' . md5($route . '|' . $slug);
+        $cacheKey = 'pv:content-id:'.md5($route.'|'.$slug);
 
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {

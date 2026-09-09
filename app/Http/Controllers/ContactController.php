@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\LeadRequest;
 use App\Mail\ContactReceived;
 use App\Models\Lead;
+use App\Models\PageAnalytic;
 use App\Models\Setting;
 use App\Services\ContentService;
+use App\Services\LeadSpamService;
 use App\Services\SecureUploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -60,7 +62,7 @@ class ContactController extends Controller
         ViewFacade::share('inquiryType', $inquiryType);
 
         $seoData = $this->contentService->getSeoData('contact', $contactPage) ?? [
-            'og_title' => 'Contact ' . setting('company_name'),
+            'og_title' => 'Contact '.setting('company_name'),
             'og_description' => 'Request an HMIS demo, software quote, or campaign strategy session.',
             'og_image' => cdn_asset('images/default-og-image.png'),
         ];
@@ -114,10 +116,10 @@ class ContactController extends Controller
             $validated['attachment_original_name'] = $stored['original_name'];
         }
 
-        $spam = app(\App\Services\LeadSpamService::class)->score($validated, $request);
+        $spam = app(LeadSpamService::class)->score($validated, $request);
         $validated['spam_score'] = $spam['score'];
         $validated['spam_reasons'] = $spam['reasons'];
-        $validated['is_spam'] = app(\App\Services\LeadSpamService::class)->isSpam((int) $spam['score']);
+        $validated['is_spam'] = app(LeadSpamService::class)->isSpam((int) $spam['score']);
 
         $lead = Lead::create($validated);
 
@@ -164,11 +166,7 @@ class ContactController extends Controller
 
     private function trackConversion(Lead $lead): void
     {
-        $today = now()->toDateString();
-
-        \App\Models\PageAnalytic::firstOrCreate(
-            ['content_id' => $lead->source_content_id, 'date' => $today],
-            ['views' => 0, 'unique_visitors' => 0, 'cta_clicks' => 0, 'leads_generated' => 0]
-        )->increment('leads_generated');
+        PageAnalytic::forDay($lead->source_content_id, now()->toDateString())
+            ->increment('leads_generated');
     }
 }

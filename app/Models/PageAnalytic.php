@@ -7,10 +7,11 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 class PageAnalytic extends Model
 {
-    use HasFactory, Cacheable;
+    use Cacheable, HasFactory;
 
     protected $table = 'page_analytics';
 
@@ -31,6 +32,38 @@ class PageAnalytic extends Model
     public function content(): BelongsTo
     {
         return $this->belongsTo(Content::class);
+    }
+
+    /**
+     * The row for one content item on one day, created if missing.
+     *
+     * Uses whereDate() rather than where('date', ...) because the `date` cast
+     * persists as "Y-m-d 00:00:00", which a bare Y-m-d string never matches on
+     * SQLite. Retries once on a concurrent-insert race (unique content_id+date).
+     */
+    public static function forDay(int $contentId, string $date): static
+    {
+        $find = fn () => static::query()
+            ->where('content_id', $contentId)
+            ->whereDate('date', $date)
+            ->first();
+
+        if ($row = $find()) {
+            return $row;
+        }
+
+        try {
+            return static::create([
+                'content_id' => $contentId,
+                'date' => $date,
+                'views' => 0,
+                'unique_visitors' => 0,
+                'cta_clicks' => 0,
+                'leads_generated' => 0,
+            ]);
+        } catch (UniqueConstraintViolationException $e) {
+            return $find() ?? throw $e;
+        }
     }
 
     // Scopes
