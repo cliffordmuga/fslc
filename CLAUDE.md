@@ -36,6 +36,7 @@ php artisan cache:bust-content                 # bumps the content cache buster
 php artisan csp:status [--days=7]              # CSP violation report summary
 php artisan images:backfill-blur               # generate LQIP blur placeholders (needs GD)
 php artisan leads:migrate-attachments          # move legacy lead files into storage/app/private
+php artisan lead-events:prune [--days=N]        # delete lead_events older than the retention window
 php artisan forefront:generate-brand-assets
 ```
 
@@ -48,7 +49,7 @@ php artisan forefront:generate-brand-assets
 - The Laravel root is uploaded **above** `public_html/`; the contents of `public/` go **into** `public_html/`. `public/.htaccess` carries a server-specific `RewriteBase /` and `SetEnv APP_LARAVEL_PATH ...` that must **not** be committed.
 - `composer deploy` runs `config:cache route:cache view:cache event:cache` + `sitemap:generate`. Anything read from `env()` outside a `config/` file will be null once config is cached — always go through `config()`.
 - No SSH assumed. Caches are cleared in production via `GET /clear-cache?token=<CLEAR_CACHE_TOKEN>`. That route is defined in `bootstrap/app.php` (not `routes/web.php`) specifically so it works with **no session/cache DB tables present**; keep it dependency-free.
-- Cron runs `php artisan schedule:run` every minute → `queue:work --stop-when-empty --max-time=45` (processes queued mail) + daily `sitemap:generate` (`routes/console.php`).
+- Cron runs `php artisan schedule:run` every minute → `queue:work --stop-when-empty --max-time=45` (processes queued mail), daily `sitemap:generate`, weekly `lead-events:prune` (`routes/console.php`).
 
 ## Architecture
 
@@ -73,6 +74,8 @@ The **`App\Enums\ContentType` enum is the single source of truth** for content t
 - `detailPath($slug)` / `redirectPathFor($type, $slug)` — public path for a type, `null` for fragments; used by `ContentObserver` to build 301s on slug change.
 
 When adding a type: add the enum case + a `labels()` entry, then wire `config/routes.php` and `routes/web.php` if it has a public URL.
+
+Tags (`content_tag` pivot) are edited from the content create/edit forms via the `admin.content.partials.tags-field` partial — checkboxes for existing `Tag`s plus a comma-separated `new_tags` field that `ContentController::syncTags()` creates on the fly (deduped by slug). There is no standalone admin Tag CRUD; hub copy (`Tag::hub_intro` / `meta_description`) is set by the seeder or tinker.
 
 ### Caching (multi-layer — the core complexity of this codebase)
 
@@ -103,7 +106,11 @@ Sitemap: Spatie sitemap + `SitemapService`, served through `SitemapController` (
 
 ### Leads & funnel
 
-`ContactController::store` is the **single** submission handler — `/contact` and the site-wide `/leads` alias both point at it (honeypot, `LeadSpamService`, secure file upload, queued `ContactReceived` mail, conversion tracking). Contact + leads share one `lead-submissions` rate limiter (defined in `AppServiceProvider`, `app.lead_submissions_per_minute`) so hitting both endpoints can't double the allowance. `LeadEvent` + `LeadEventController` (`POST /lead-events`) capture client-side funnel events. Lead file attachments live in `storage/app/private/leads/` (never web-accessible; download via a signed admin route).
+`ContactController::store` is the **single** submission handler — `/contact` and the site-wide `/leads` alias both point at it (honeypot, `LeadSpamService`, secure file upload, conversion tracking). Contact + leads share one `lead-submissions` rate limiter (defined in `AppServiceProvider`, `app.lead_submissions_per_minute`) so hitting both endpoints can't double the allowance. `LeadEvent` + `LeadEventController` (`POST /lead-events`) capture client-side funnel events; `lead-events:prune` (scheduled weekly, `config('forefront.lead_events.retention_days', 90)`) keeps that table bounded. Lead file attachments live in `storage/app/private/leads/` (never web-accessible; download via a signed admin route).
+
+**Admin notification** goes through `Lead::notifyAdmin()` — queues the `ContactReceived` mail once, guarded by `leads.admin_notified_at`. Called from `ContactController::store` (non-spam path) and from `LeadController::markAsNotSpam` / bulk `mark_not_spam`, so a real lead auto-flagged as spam still reaches the inbox when an admin clears the flag.
+
+**Spam scoring**: `LeadSpamService::score()` returns a 0–100 score; `isSpam()` compares it to `config('forefront.lead_spam.threshold', 45)` (config, not raw `env()`, so it survives `config:cache`). A spam lead is still stored (`is_spam = true`) but never emailed.
 
 ### Auth & authorization
 
@@ -118,7 +125,7 @@ Breeze + optional Socialite (gated by `config('features.social_login_enabled')` 
 - **`app/helpers.php` is autoloaded** (composer `files`) and holds ~40 view helpers: `setting()`/`settings()` (24h-cached DB settings), `meta_title()`, `canonical_url()`, `render_cms_content()`, `sanitize_rich_html()`, `image_srcset()`, `hero_asset()`, `generate_excerpt()`, etc. Check here before writing a new Blade helper.
 - **Settings** are DB-backed key/values (`Setting` model, `SettingService`, admin UI) — company name, address, phone, founded year, etc. flow through `setting()`.
 - **Activity log**: Spatie `LogsActivity` on `Content`, `User`, and others; `ActivityLogController` + cached recent-activity in the admin sidebar.
-- **Config lives in custom files**: `config/forefront.php` (portfolio pillars, per-service lead config, tag hub intros, inquiry UX copy), `config/public_page_cache.php`, `config/seo.php`, `config/image.php`, `config/uploads.php`, `config/security.php` (CSP), `config/features.php`.
+- **Config lives in custom files**: `config/forefront.php` (portfolio pillars, per-service lead config, tag hub intros, inquiry UX copy, `lead_spam.threshold`, `lead_events.retention_days`), `config/public_page_cache.php`, `config/seo.php`, `config/image.php`, `config/uploads.php`, `config/security.php` (CSP), `config/features.php`.
 - **CSP**: `SecurityHeaders` middleware emits the policy; browsers post violations to `POST /csp-report` → `CspReportController`; review with `php artisan csp:status`.
 - Tests use sqlite `:memory:`, `array` cache, `sync` queue, `array` mail (`phpunit.xml`). The `*RefinementTest` / `*RemediationTest` feature tests are regression guards for specific past fixes — run the relevant one after touching frontend pages, SEO, or uploads. `tests/Unit` covers the pure logic (`ContentType`, `ContentCacheManager`, `PageSeoService`, `LeadSpamService`, image cache keys).
 - **Watch the `date` cast on `PageAnalytic`**: it persists as `Y-m-d 00:00:00`, so `where('date', $ymd)` only matches on MySQL (real `DATE` column). Use `PageAnalytic::forDay($contentId, $ymd)` (whereDate lookup + create + race retry) then `increment()` on the returned row — both `TrackPageViews` and `ContactController::trackConversion()` go through it.
