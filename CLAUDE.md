@@ -104,6 +104,8 @@ When adding a cached read, register its key/tag so an observer or trait clears i
 
 Sitemap: Spatie sitemap + `SitemapService`, served through `SitemapController` (`xml` / `html` / admin `generate`). `GET /sitemap.xml` self-heals if missing/outdated; `RegenerateSitemapJob` fires on content changes; daily schedule. The generated `public/sitemap.xml` is gitignored.
 
+**Static CMS pages** (`/privacy`, `/terms`) fetch their optional CMS body via `ContentService::getPage($slug)` — a cached `type=page` lookup, not a raw query per request. `FrontendController::previewContent` is the one deliberately-uncached content read (draft preview via a signed URL).
+
 ### Leads & funnel
 
 `ContactController::store` is the **single** submission handler — `/contact` and the site-wide `/leads` alias both point at it (honeypot, `LeadSpamService`, secure file upload, conversion tracking). Contact + leads share one `lead-submissions` rate limiter (defined in `AppServiceProvider`, `app.lead_submissions_per_minute`) so hitting both endpoints can't double the allowance. `LeadEvent` + `LeadEventController` (`POST /lead-events`) capture client-side funnel events; `lead-events:prune` (scheduled weekly, `config('forefront.lead_events.retention_days', 90)`) keeps that table bounded. Lead file attachments live in `storage/app/private/leads/` (never web-accessible; download via a signed admin route).
@@ -111,6 +113,8 @@ Sitemap: Spatie sitemap + `SitemapService`, served through `SitemapController` (
 **Admin notification** goes through `Lead::notifyAdmin()` — queues the `ContactReceived` mail once, guarded by `leads.admin_notified_at`. Called from `ContactController::store` (non-spam path) and from `LeadController::markAsNotSpam` / bulk `mark_not_spam`, so a real lead auto-flagged as spam still reaches the inbox when an admin clears the flag.
 
 **Spam scoring**: `LeadSpamService::score()` returns a 0–100 score; `isSpam()` compares it to `config('forefront.lead_spam.threshold', 45)` (config, not raw `env()`, so it survives `config:cache`). A spam lead is still stored (`is_spam = true`) but never emailed.
+
+**Lead attribution**: `source_content_id` (the page the form was on) and `service_content_id` (the service picked in the form) — relations `sourceContent()` / `serviceContent()`. `scopeHighIntent()` and the `is_high_intent` accessor treat a lead as high-intent when its `inquiry_type` isn't general/newsletter, it isn't spam, **and** it carries either content id.
 
 ### Auth & authorization
 
