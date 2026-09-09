@@ -77,33 +77,30 @@ trait AssignsDefaultRole
 
     /**
      * Determine which role to assign
-     * 
+     *
      * Priority order:
-     * 1. Custom role parameter
-     * 2. Role from request query
-     * 3. Role from config for provider
-     * 4. Default role from config
-     * 
+     * 1. Custom role parameter (caller-supplied in code only)
+     * 2. Role from config for provider
+     * 3. Default role from config
+     *
+     * NOTE: request input is deliberately NOT a source here. Trusting a
+     * `role` request parameter let an anonymous visitor self-assign `admin`
+     * during registration (POST /register?role=admin). Elevated roles must
+     * come from a trusted server-side path (seeder, signed invite, explicit
+     * $customRole passed by an authorized controller).
+     *
      * @param User $user
      * @param string|null $customRole
      * @return string
      */
     protected function determineRole(User $user, ?string $customRole = null): string
     {
-        // 1. Use custom role if provided
+        // 1. Use custom role if provided (code-level, e.g. a future admin-invite flow)
         if ($customRole) {
             return $customRole;
         }
 
-        // 2. Check request query for role (for invite links)
-        if (request()->has('role')) {
-            $requestRole = request()->query('role');
-            if ($this->isValidRole($requestRole)) {
-                return $requestRole;
-            }
-        }
-
-        // 3. Check provider-specific config
+        // 2. Check provider-specific config
         if ($user->provider) {
             $providerRole = config("auth.providers.{$user->provider}.default_role");
             if ($providerRole && $this->isValidRole($providerRole)) {
@@ -111,7 +108,7 @@ trait AssignsDefaultRole
             }
         }
 
-        // 4. Fall back to default
+        // 3. Fall back to default
         return $this->getDefaultRole();
     }
 
@@ -152,7 +149,7 @@ trait AssignsDefaultRole
      */
     protected function isValidRole(string $role): bool
     {
-        return in_array($role, $this->getValidRoles());
+        return in_array($role, $this->getValidRoles(), true);
     }
 
     /**
