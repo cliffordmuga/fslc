@@ -1,0 +1,36 @@
+# Prevent directory listing
+Options -Indexes
+
+# Block script execution
+<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|cgi|asp|aspx|jsp|shtml|sh)$">
+    Require all denied
+</FilesMatch>
+
+# Allow image files
+<FilesMatch "\.(jpg|jpeg|png|gif|bmp|webp|svg|ico)$">
+    Require all granted
+</FilesMatch>
+
+# Block sensitive files
+<FilesMatch "\.(ini|log|conf|bak|env|sql|sh)$">
+    Require all denied
+</FilesMatch>
+
+# Disable PHP execution
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+
+# Enable image caching (1 year)
+<IfModule mod_headers.c>
+    Header set Cache-Control "max-age=31536000, public, immutable"
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>
+
+# Optional: Enable Gzip compression for SVG
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>

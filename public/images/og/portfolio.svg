@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Portfolio">
+  <rect width="1200" height="630" fill="#1e293b"/>
+  <rect x="48" y="48" width="8" height="534" fill="#2563eb"/>
+  <text x="96" y="280" fill="#f8fafc" font-family="system-ui,sans-serif" font-size="52" font-weight="700">Case Studies</text>
+  <text x="96" y="340" fill="#94a3b8" font-family="system-ui,sans-serif" font-size="28">Forefront Solutions Kenya</text>
+</svg>

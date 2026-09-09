@@ -1,0 +1,12 @@
+User-agent: *
+Disallow: /admin
+Disallow: /login
+Disallow: /register
+Disallow: /password
+Disallow: /search
+Disallow: /preview
+Disallow: /dashboard
+Disallow: /2fa
+Disallow: /auth
+
+Sitemap: https://forefrontsolutions.co.ke/sitemap.xml

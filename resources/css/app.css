@@ -1,0 +1,338 @@
+/* ============================================================================
+   FILE: resources/css/app.css
+   Design: Sharp / Structural — tokens in tokens.css for theme swaps
+   ============================================================================ */
+
+@import "./tokens.css";
+
+/* ============================================================================
+   TAILWIND LAYERS
+   ============================================================================ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   BASE
+   ============================================================================ */
+html {
+    scroll-behavior: smooth;
+    font-size: 16px;
+}
+
+[x-cloak] { display: none !important; }
+
+/* Anchor offset for fixed nav */
+[id] { scroll-margin-top: 4.5rem; }
+@media (min-width: 1024px) { [id] { scroll-margin-top: 5rem; } }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+body {
+    @apply bg-white text-neutral-900 antialiased;
+    font-feature-settings: "kern" "liga";
+    -webkit-font-smoothing: antialiased;
+}
+
+*:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+}
+
+/* ============================================================================
+   COMPONENT CLASSES
+   ============================================================================ */
+@layer components {
+
+    /* ── Card ──────────────────────────────────────────────────────────────── */
+    .card-base {
+        @apply bg-white border border-neutral-200 overflow-hidden;
+        transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+    .card-base:hover {
+        border-color: #a3a3a3;
+        box-shadow: var(--shadow-hover);
+    }
+
+    /* CMS content cards — equal-height grid rows */
+    .content-card-grid {
+        @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6;
+    }
+    .content-card-grid-xl {
+        @apply xl:grid-cols-4;
+    }
+    .content-card-grid > article {
+        @apply h-full;
+    }
+
+    /* ── Primary button (token-driven for rebrand) ─────────────────────────── */
+    .btn-primary {
+        @apply inline-flex items-center justify-center gap-2
+               text-white font-semibold
+               focus:outline-none focus:ring-2 focus:ring-offset-2
+               min-h-[48px] px-6 py-3;
+        background-color: var(--color-brand);
+        border-radius: var(--radius-button);
+        transition: background-color var(--transition), box-shadow var(--transition);
+    }
+    .btn-primary:hover {
+        background-color: var(--color-brand-hover);
+    }
+    .btn-primary:focus {
+        --tw-ring-color: var(--color-brand);
+    }
+
+    /* ── Secondary / outline button ────────────────────────────────────────── */
+    .btn-secondary {
+        @apply inline-flex items-center justify-center gap-2
+               border border-neutral-300 text-neutral-700 font-semibold bg-white
+               hover:bg-neutral-50 hover:border-neutral-400
+               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+               min-h-[48px] px-6 py-3;
+        transition: all var(--transition);
+    }
+
+    /* Ghost button for dark hero backgrounds */
+    .btn-ghost-dark {
+        @apply inline-flex items-center justify-center gap-2
+               border border-white/40 text-white font-semibold bg-transparent
+               hover:bg-white/10 hover:border-white/60
+               focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-neutral-900
+               min-h-[48px] px-6 py-3;
+        transition: all var(--transition);
+    }
+
+    /* ── Danger button ─────────────────────────────────────────────────────── */
+    .btn-danger {
+        @apply inline-flex items-center justify-center gap-2
+               bg-red-600 text-white font-semibold
+               hover:bg-red-700
+               focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2
+               min-h-[48px] px-6 py-3;
+        transition: background-color var(--transition);
+    }
+
+    /* Outline brand button (CTA secondary) */
+    .btn-outline {
+        @apply inline-flex items-center justify-center gap-2
+               border border-primary-600 text-primary-600 font-semibold bg-white
+               hover:bg-primary-600 hover:text-white
+               focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+               min-h-[48px] px-6 py-3;
+        border-radius: var(--radius-button);
+        transition: all var(--transition);
+    }
+
+    /* Solid dark button */
+    .btn-dark {
+        @apply inline-flex items-center justify-center gap-2
+               bg-neutral-800 text-white font-semibold
+               hover:bg-neutral-900
+               focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2
+               min-h-[48px] px-6 py-3;
+        border-radius: var(--radius-button);
+        transition: background-color var(--transition);
+    }
+
+    /* Page content width — hubs / sections */
+    .page-container {
+        @apply w-full mx-auto px-6 lg:px-8;
+        max-width: var(--page-max);
+    }
+
+    /* ── Form input ────────────────────────────────────────────────────────── */
+    .input-base {
+        @apply block w-full px-4 py-3 text-sm border border-neutral-300 bg-white
+               focus:border-primary-500 focus:ring-1 focus:ring-primary-500
+               placeholder:text-neutral-400 min-h-[48px];
+        transition: border-color var(--transition);
+    }
+
+    /* ── Navigation link ───────────────────────────────────────────────────── */
+    .nav-link {
+        @apply relative px-4 py-2 text-sm font-medium text-neutral-700
+               hover:text-primary-600 transition-colors duration-200;
+    }
+
+    /* ── Section label (eyebrow text) ──────────────────────────────────────── */
+    .section-label {
+        @apply text-xs font-semibold uppercase tracking-[0.15em];
+        color: var(--color-brand);
+    }
+
+    /* ── Floating WhatsApp CTA ─────────────────────────────────────────────── */
+    .floating-cta {
+        @apply fixed bottom-6 right-6 w-14 h-14 text-white
+               flex items-center justify-center shadow-lg
+               focus:outline-none focus:ring-2 z-50;
+        background-color: var(--color-brand);
+        border-radius: var(--radius-button);
+        transition: background-color var(--transition);
+    }
+    .floating-cta:hover {
+        background-color: var(--color-brand-hover);
+    }
+    .floating-cta:focus {
+        --tw-ring-color: var(--color-brand);
+    }
+}
+
+/* ============================================================================
+   UTILITY CLASSES
+   ============================================================================ */
+@layer utilities {
+
+    /* Shadow aliases (referenced throughout views) */
+    .shadow-soft     { box-shadow: var(--shadow-card); }
+    .shadow-medium   { box-shadow: 0 2px 6px rgb(0 0 0 / 0.10); }
+    .shadow-elevated { box-shadow: var(--shadow-hover); }
+
+    /* Hover lift — subtle upward nudge */
+    .hover-lift {
+        transition: transform var(--transition), box-shadow var(--transition);
+    }
+    .hover-lift:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-hover);
+    }
+
+    /* Glass — used in hero metrics bar */
+    .glass {
+        background: rgba(255,255,255,0.85);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.20);
+    }
+
+    /* Focus ring */
+    .focus-ring {
+        @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+    }
+
+    /* Hero grid overlay */
+    .bg-hero-grid {
+        background-image:
+            linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+        background-size: 48px 48px;
+    }
+
+    /* Compact section spacing */
+    .section-py   { padding-top: var(--section-y); padding-bottom: var(--section-y); }
+    .section-py-lg { padding-top: var(--section-y-lg); padding-bottom: var(--section-y-lg); }
+
+    /* Slow pulse — respects reduced motion via motion-safe: prefix in markup */
+    @keyframes pulse-slow {
+        0%, 100% { opacity: 0.4; }
+        50%      { opacity: 0.8; }
+    }
+    .motion-safe\:animate-pulse-slow {
+        animation: pulse-slow 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* Pillar accent borders for values / service cards */
+    .pillar-border-hmis      { border-top-color: var(--pillar-hmis); }
+    .pillar-border-software  { border-top-color: var(--pillar-software); }
+    .pillar-border-branding  { border-top-color: var(--pillar-branding); }
+    .pillar-border-campaigns { border-top-color: var(--pillar-campaigns); }
+    .pillar-text-hmis        { color: var(--pillar-hmis); }
+    .pillar-text-software    { color: var(--pillar-software); }
+    .pillar-text-branding    { color: var(--pillar-branding); }
+    .pillar-text-campaigns   { color: var(--pillar-campaigns); }
+
+    .pillar-filter-active-hmis      { background-color: var(--pillar-hmis); border-color: var(--pillar-hmis); color: #fff; }
+    .pillar-filter-active-software  { background-color: var(--pillar-software); border-color: var(--pillar-software); color: #fff; }
+    .pillar-filter-active-branding   { background-color: var(--pillar-branding); border-color: var(--pillar-branding); color: #fff; }
+    .pillar-filter-active-political  { background-color: var(--pillar-campaigns); border-color: var(--pillar-campaigns); color: #fff; }
+
+    /* Hero height + inner vertical rhythm (homepage spacing on all public heroes) */
+    .hero-inner {
+        padding-top: var(--hero-inner-py);
+        padding-bottom: var(--hero-inner-py);
+    }
+    .hero-h-home,
+    .hero-h-standard {
+        min-height: var(--hero-home-h);
+    }
+    @media (min-width: 1024px) {
+        .hero-inner {
+            padding-top: var(--hero-inner-py-lg);
+            padding-bottom: var(--hero-inner-py-lg);
+        }
+        .hero-h-home,
+        .hero-h-standard {
+            min-height: var(--hero-home-h-lg);
+        }
+    }
+}
+
+/* ============================================================================
+   PROSE / RICH CONTENT
+   ============================================================================ */
+.prose-custom {
+    @apply prose prose-neutral max-w-none;
+}
+.prose-custom h2 {
+    @apply text-xl lg:text-2xl font-bold text-neutral-900 mt-10 mb-3 tracking-tight;
+}
+.prose-custom h3 {
+    @apply text-lg lg:text-xl font-semibold text-neutral-900 mt-8 mb-2 tracking-tight;
+}
+.prose-custom p  { @apply text-neutral-600 leading-relaxed mb-4; }
+.prose-custom a  { @apply text-primary-600 hover:text-primary-700 underline underline-offset-2; }
+.prose-custom ul,
+.prose-custom ol { @apply my-5 space-y-2 pl-5; }
+.prose-custom li { @apply text-neutral-700 leading-relaxed; }
+.prose-custom strong { @apply font-semibold text-neutral-900; }
+.prose-custom blockquote {
+    @apply border-l-4 border-primary-500 pl-5 py-1 my-5 text-neutral-600 italic not-italic;
+}
+.prose-custom img { @apply my-5 w-full; }
+
+/* ============================================================================
+   NAV STATES
+   ============================================================================ */
+.nav-default  { @apply bg-white/95 backdrop-blur-md border-b border-neutral-200 transition-all duration-300; }
+.nav-scrolled { @apply bg-white border-b border-neutral-200 shadow-sm transition-all duration-300; }
+
+/* ============================================================================
+   TINYMCE ADMIN EDITOR
+   ============================================================================ */
+.tox-editor-container {
+    @apply border border-neutral-200;
+}
+.tox-editor-container:focus-within {
+    @apply border-primary-500 ring-1 ring-primary-500;
+}
+
+/* ============================================================================
+   FLASH / PROGRESS BAR
+   ============================================================================ */
+@keyframes progress-bar {
+    from { width: 100%; }
+    to   { width: 0%; }
+}
+.animate-progress-bar {
+    animation: progress-bar 5s linear forwards;
+    width: 100%;
+}
+
+/* ============================================================================
+   PRINT
+   ============================================================================ */
+@media print {
+    nav, footer, .floating-cta, .no-print { display: none !important; }
+    body { background: white; color: black; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .motion-safe\:animate-pulse-slow,
+    .animate-pulse-slow {
+        animation: none !important;
+    }
+}

@@ -1,0 +1,17 @@
+{
+    "folders": [
+        {
+            "name": "fslc",
+            "path": "."
+        },
+        {
+            "name": "esoko",
+            "path": "../esoko"
+        }
+    ],
+    "settings": {
+        "intelephense.environment.includePaths": [
+            "${workspaceFolder}/vendor"
+        ]
+    }
+}

@@ -1,0 +1,73 @@
+/* ============================================================================
+   DESIGN TOKENS — single source for theme / rebrand
+   Import from app.css. Override via :root in layouts (CMS primary_color).
+   ============================================================================ */
+
+:root {
+    /* Brand (overridden at runtime from settings) */
+    --color-brand: #0ea5e9;
+    --color-brand-hover: #0284c7;
+    --color-brand-muted: #e0f2fe;
+    --color-brand-strong: #0369a1;
+
+    /* Aliases used across components */
+    --primary: var(--color-brand);
+    --primary-hover: var(--color-brand-hover);
+
+    /* Surfaces & ink */
+    --color-surface: #ffffff;
+    --color-surface-muted: #fafafa;
+    --color-ink: #171717;
+    --color-ink-muted: #525252;
+
+    --neutral-50: #fafafa;
+    --neutral-100: #f5f5f5;
+    --neutral-200: #e5e5e5;
+    --neutral-900: #171717;
+
+    /* Four-pillar brand tokens */
+    --pillar-hmis: #0ea5e9;
+    --pillar-software: #6366f1;
+    --pillar-branding: #f59e0b;
+    --pillar-campaigns: #10b981;
+
+    /* Shape — sharp by default; change here to modernize radii globally */
+    --radius-card: 0px;
+    --radius-button: 0px;
+    --radius-none: 0px;
+
+    /* Hero heights */
+    --hero-home-h: 48vh;
+    --hero-home-h-lg: 58vh;
+    --hero-inner-py: 2rem;
+    --hero-inner-py-lg: 2.5rem;
+
+    /* Section rhythm */
+    --section-y: 2.5rem;
+    --section-y-lg: 4rem;
+
+    /* Status (alerts / badges) */
+    --color-success: #16a34a;
+    --color-success-muted: #f0fdf4;
+    --color-warning: #d97706;
+    --color-warning-muted: #fffbeb;
+    --color-danger: #dc2626;
+    --color-danger-muted: #fef2f2;
+    --color-info: var(--color-brand);
+    --color-info-muted: var(--color-brand-muted);
+
+    /* Borders & elevation */
+    --border: #e5e5e5;
+    --border-strong: #d4d4d4;
+    --shadow-card: 0 1px 3px rgb(0 0 0 / 0.08);
+    --shadow-hover: 0 4px 12px rgb(0 0 0 / 0.12);
+
+    /* Layout */
+    --page-max: 80rem; /* max-w-7xl */
+    --sticky-bar-h: 3.5rem;
+
+    --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Font stack token (Figtree loaded in layout) */
+    --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+}
