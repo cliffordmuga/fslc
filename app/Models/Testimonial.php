@@ -2,16 +2,16 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use App\Traits\Cacheable;
-use Spatie\Activitylog\Traits\LogsActivity;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Testimonial extends Model
 {
-    use HasFactory, Cacheable, LogsActivity;
+    use Cacheable, HasFactory, LogsActivity;
 
     protected $fillable = [
         'client_name',
@@ -74,7 +74,7 @@ class Testimonial extends Model
         return LogOptions::defaults()
             ->logFillable()
             ->logOnlyDirty()
-            ->setDescriptionForEvent(fn(string $eventName) => "Testimonial from {$this->client_name} was {$eventName}");
+            ->setDescriptionForEvent(fn (string $eventName) => "Testimonial from {$this->client_name} was {$eventName}");
     }
 
     // Cache keys
@@ -82,8 +82,13 @@ class Testimonial extends Model
     {
         return [
             "testimonial_{$this->id}",
-            "featured_testimonials",
-            "approved_testimonials",
+            'featured_testimonials',
+            'approved_testimonials',
         ];
+    }
+
+    public function getCacheTags(): array
+    {
+        return ['testimonials'];
     }
 }

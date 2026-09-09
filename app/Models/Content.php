@@ -2,12 +2,7 @@
 
 namespace App\Models;
 
-use App\Models\Cta;
-use App\Models\Lead;
-use App\Models\PageAnalytic;
-use App\Models\Tag;
-use App\Models\Testimonial;
-use App\Models\User;
+use App\Enums\ContentType;
 use App\Traits\Cacheable;
 use App\Traits\Imageable;
 use App\Traits\Seoable;
@@ -25,7 +20,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Content extends Model
 {
-    use HasFactory, Cacheable, Imageable, Seoable, LogsActivity;
+    use Cacheable, HasFactory, Imageable, LogsActivity, Seoable;
 
     protected $fillable = [
         'title',
@@ -43,43 +38,40 @@ class Content extends Model
         'published_at' => 'datetime',
     ];
 
-    public const TYPES = [
-        'portfolio'     => 'Portfolio Item',
-        'services'      => 'Services',
-        'page'          => 'Page',
-        'about'         => 'About',
-        'mission'       => 'Mission',
-        'vision'        => 'Vision',
-        'intro'         => 'Intro',
-        'blog'          => 'Blog',
-        'timeline_item' => 'Timeline Item',
-        'faq_item'      => 'FAQ Item',
-    ];
+    /**
+     * Admin type labels — sourced from ContentType enum.
+     *
+     * @return array<string, string>
+     */
+    public static function typeLabels(): array
+    {
+        return ContentType::labels();
+    }
 
     public const STATUSES = [
-        'draft'     => 'Draft',
+        'draft' => 'Draft',
         'published' => 'Published',
     ];
 
     protected static function booted(): void
     {
         static::creating(function (Content $content) {
-            if (empty($content->slug) && !empty($content->title)) {
+            if (empty($content->slug) && ! empty($content->title)) {
                 $content->slug = static::makeUniqueSlug(Str::slug($content->title));
             }
-            if (empty($content->excerpt) && !empty($content->content)) {
+            if (empty($content->excerpt) && ! empty($content->content)) {
                 $content->excerpt = generate_excerpt($content->content, 155);
             }
         });
 
         // Slug: only fix if empty; if user changed slug, make it unique
         static::updating(function (Content $content) {
-            if (empty($content->slug) && !empty($content->title)) {
+            if (empty($content->slug) && ! empty($content->title)) {
                 $content->slug = static::makeUniqueSlug(Str::slug($content->title), $content->id);
-            } elseif ($content->isDirty('slug') && !empty($content->slug)) {
+            } elseif ($content->isDirty('slug') && ! empty($content->slug)) {
                 $content->slug = static::makeUniqueSlug($content->slug, $content->id);
             }
-            if (empty($content->excerpt) && !empty($content->content)) {
+            if (empty($content->excerpt) && ! empty($content->content)) {
                 $content->excerpt = generate_excerpt($content->content, 155);
             }
         });
@@ -92,7 +84,7 @@ class Content extends Model
 
         while (static::query()
             ->where('slug', $slug)
-            ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
+            ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
             ->exists()
         ) {
             $i++;
@@ -178,14 +170,14 @@ class Content extends Model
         return Cache::remember($cacheKey, now()->addHour(), function () {
             $typeRoutes = config('routes.content_types', [
                 'portfolio' => 'portfolio.show',
-                'services'  => 'services.show',
-                'blog'      => 'blog.show',
-                'page'      => 'page.show',
-                'about'     => 'about',
-                'mission'   => 'mission',
-                'vision'    => 'vision',
-                'intro'     => 'intro',
-                'default'   => 'page.show',
+                'services' => 'services.show',
+                'blog' => 'blog.show',
+                'page' => 'page.show',
+                'about' => 'about',
+                'mission' => 'mission',
+                'vision' => 'vision',
+                'intro' => 'intro',
+                'default' => 'page.show',
             ]);
 
             $routeName = $typeRoutes[$this->type] ?? $typeRoutes['default'];
@@ -294,7 +286,7 @@ class Content extends Model
                     if ($byVariant->has($v)) {
                         $im = $byVariant->get($v);
                         $w = (int) (($variantsConfig[$v] ?? [150])[0] ?? 150);
-                        $srcsetParts[] = $im->url . ' ' . $w . 'w';
+                        $srcsetParts[] = $im->url.' '.$w.'w';
                     }
                 }
                 $thumbSrcset = count($srcsetParts) ? implode(', ', $srcsetParts) : null;
@@ -336,8 +328,7 @@ class Content extends Model
             ->logFillable()
             ->logOnlyDirty()
             ->setDescriptionForEvent(
-                fn(string $eventName) =>
-                "Content '{$this->title}' was {$eventName}"
+                fn (string $eventName) => "Content '{$this->title}' was {$eventName}"
             );
     }
 

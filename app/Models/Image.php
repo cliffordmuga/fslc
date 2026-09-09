@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class Image extends Model
 {
-    use HasFactory, Cacheable;
+    use Cacheable, HasFactory;
 
     protected $fillable = [
         'imageable_type',
@@ -56,10 +56,14 @@ class Image extends Model
     public function getCacheKeys(): array
     {
         $prefix = $this->cachePrefix();
+        $disk = config('image.disk', 'public_uploads');
+        $path = ltrim((string) $this->image_url, '/');
 
         return [
             "{$prefix}:id:{$this->id}",
-            "{$prefix}:owner:" . strtolower(class_basename($this->imageable_type)) . ":{$this->imageable_id}:{$this->collection}",
+            "{$prefix}:owner:".strtolower(class_basename($this->imageable_type)).":{$this->imageable_id}:{$this->collection}",
+            "image_url_{$disk}_".md5($path),
+            'img_variants:'.md5($this->imageable_type.':'.$this->imageable_id.':'.$this->collection),
         ];
     }
 

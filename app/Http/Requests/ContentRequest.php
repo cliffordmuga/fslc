@@ -2,9 +2,10 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 use App\Models\Content;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class ContentRequest extends FormRequest
 {
@@ -24,9 +25,9 @@ class ContentRequest extends FormRequest
                 'string',
                 'max:255',
                 'regex:/^[a-z0-9-]+$/',
-                Rule::unique('contents')->ignore($contentId)
+                Rule::unique('contents')->ignore($contentId),
             ],
-            'type' => ['required', Rule::in(array_keys(Content::TYPES))],
+            'type' => ['required', Rule::in(array_keys(Content::typeLabels()))],
             'excerpt' => ['nullable', 'string', 'max:500'],
             'content' => ['nullable', 'string'],
             'status' => ['required', Rule::in(array_keys(Content::STATUSES))],
@@ -63,14 +64,14 @@ class ContentRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         if ($this->filled('title') && empty($this->slug)) {
-            $this->merge(['slug' => \Illuminate\Support\Str::slug($this->title)]);
+            $this->merge(['slug' => Str::slug($this->title)]);
         }
 
         if (empty($this->excerpt) && $this->filled('content')) {
             $this->merge(['excerpt' => generate_excerpt($this->content, 155)]);
         }
 
-        if ($this->status === 'published' && !$this->filled('published_at')) {
+        if ($this->status === 'published' && ! $this->filled('published_at')) {
             $this->merge(['published_at' => now()]);
         }
     }

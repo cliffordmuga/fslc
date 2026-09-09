@@ -2,14 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Traits\Cacheable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Cta extends Model
 {
-    use HasFactory, Cacheable;
+    use Cacheable, HasFactory;
 
     protected $fillable = [
         'content_id',
@@ -52,5 +52,10 @@ class Cta extends Model
             "cta_{$this->id}",
             "cta_content_{$this->content_id}",
         ];
+    }
+
+    public function getCacheTags(): array
+    {
+        return ['ctas'];
     }
 }

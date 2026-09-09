@@ -2,9 +2,12 @@
 
 namespace App\Observers;
 
+use App\Enums\ContentType;
 use App\Jobs\RegenerateSitemapJob;
 use App\Models\Content;
 use App\Models\Redirect;
+use App\Support\AdminUiCache;
+use App\Support\ContentCache;
 
 class ContentObserver
 {
@@ -18,6 +21,11 @@ class ContentObserver
             if ($oldSlug && $newSlug && $oldSlug !== $newSlug) {
                 $oldPath = $this->pathFor($content->type, $oldSlug);
                 $newPath = $this->pathFor($content->type, $newSlug);
+
+                // Fragment types (timeline/FAQ) have no public URL — skip redirect rows.
+                if ($oldPath === null || $newPath === null) {
+                    return;
+                }
 
                 // Don't create self-redirects
                 if ($oldPath !== $newPath) {
@@ -37,9 +45,9 @@ class ContentObserver
             RegenerateSitemapJob::dispatch()->onQueue('default');
         }
 
-        \App\Support\ContentCache::bust();
-        \App\Support\AdminUiCache::forgetPublishedContentOptions();
-        \App\Support\AdminUiCache::forgetDashboardAndAnalytics();
+        ContentCache::bust();
+        AdminUiCache::forgetPublishedContentOptions();
+        AdminUiCache::forgetDashboardAndAnalytics();
     }
 
     public function deleted(Content $content): void
@@ -47,38 +55,13 @@ class ContentObserver
         // If published content is deleted, sitemap should refresh
         RegenerateSitemapJob::dispatch()->onQueue('default');
 
-        \App\Support\ContentCache::bust();
-        \App\Support\AdminUiCache::forgetPublishedContentOptions();
-        \App\Support\AdminUiCache::forgetDashboardAndAnalytics();
+        ContentCache::bust();
+        AdminUiCache::forgetPublishedContentOptions();
+        AdminUiCache::forgetDashboardAndAnalytics();
     }
 
-    /* private function pathFor(string $type, string $slug): string
+    private function pathFor(string $type, string $slug): ?string
     {
-        // Keep this aligned with your routes:
-        // portfolio detail: /portfolio/{slug}
-        // services detail: /services/{slug}
-        // blog detail: /blog/{slug}
-        // pages: /{slug}
-        $slug = ltrim($slug, '/');
-
-        return match ($type) {
-            'portfolio' => '/portfolio/' . $slug,
-            'services'  => '/services/' . $slug,
-            'blog'      => '/blog/' . $slug,
-            default     => '/' . $slug,
-        };
-    } */
-
-    private function pathFor(string $type, string $slug): string
-    {
-        $slug = ltrim($slug, '/');
-
-        return match ($type) {
-            \App\Enums\ContentType::Portfolio->value => '/portfolio/' . $slug,
-            \App\Enums\ContentType::Services->value  => '/services/' . $slug,
-            \App\Enums\ContentType::Blog->value      => '/insights/' . $slug,
-            \App\Enums\ContentType::Page->value      => '/page/' . $slug,
-            default => '/' . $slug,
-        };
+        return ContentType::redirectPathFor($type, $slug);
     }
 }

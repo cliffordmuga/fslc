@@ -1,27 +1,28 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
-use App\Http\Controllers\FrontendController;
-use App\Http\Controllers\ContactController;
-use App\Http\Controllers\SearchController;
-use App\Http\Controllers\HealthController;
-use App\Http\Controllers\CspReportController;
-use App\Http\Controllers\Auth\SocialiteController;
-use App\Http\Controllers\Auth\TwoFactorController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\LeadEventController;
+use App\Http\Controllers\ActivityLogController as AdminActivityLogController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\RedirectController as AdminRedirectController;
-use App\Http\Controllers\NewsletterController;
-use App\Http\Controllers\ContentController as AdminContentController;
-use App\Http\Controllers\LeadController as AdminLeadController;
-use App\Http\Controllers\TestimonialController as AdminTestimonialController;
-use App\Http\Controllers\SettingController as AdminSettingController;
-use App\Http\Controllers\CtaController as AdminCtaController;
 use App\Http\Controllers\AnalyticsController as AdminAnalyticsController;
-use App\Http\Controllers\ActivityLogController as AdminActivityLogController;
-use App\Services\SitemapService;
+use App\Http\Controllers\Api\CtaController;
+use App\Http\Controllers\Auth\SocialiteController;
+use App\Http\Controllers\Auth\TwoFactorController;
+use App\Http\Controllers\ContactController;
+use App\Http\Controllers\ContentController as AdminContentController;
+use App\Http\Controllers\CspReportController;
+use App\Http\Controllers\CtaController as AdminCtaController;
+use App\Http\Controllers\FrontendController;
+use App\Http\Controllers\HealthController;
+use App\Http\Controllers\LeadController as AdminLeadController;
+use App\Http\Controllers\LeadEventController;
+use App\Http\Controllers\NewsletterController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SearchController;
+use App\Http\Controllers\SettingController as AdminSettingController;
+use App\Http\Controllers\SitemapController;
+use App\Http\Controllers\TestimonialController as AdminTestimonialController;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -46,7 +47,6 @@ Route::get('/about', [FrontendController::class, 'about'])->name('about');
 Route::get('/privacy', [FrontendController::class, 'privacy'])->name('privacy');
 Route::get('/terms', [FrontendController::class, 'terms'])->name('terms');
 
-
 // Contact
 Route::get('/contact', [ContactController::class, 'show'])->name('contact');
 Route::post('/contact', [ContactController::class, 'store'])
@@ -70,7 +70,6 @@ Route::post('/leads', [ContactController::class, 'store'])
     ->name('leads.store')
     ->middleware('throttle:lead-submissions');
 
-
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
     ->name('newsletter.subscribe')
     ->middleware('throttle:5,1');
@@ -79,7 +78,6 @@ Route::post('/lead-events', [LeadEventController::class, 'store'])
     ->name('lead-events.store')
     ->middleware('throttle:30,1');
 
-
 Route::get('/health', HealthController::class)->name('health');
 
 // Clear-cache route is in bootstrap/app.php (no web middleware — works without sessions table)
@@ -87,8 +85,6 @@ Route::get('/health', HealthController::class)->name('health');
 Route::post('/csp-report', CspReportController::class)
     ->name('csp.report')
     ->middleware('throttle:30,1'); // max 30 reports per minute per IP
-
-
 
 // ===================================
 // SOCIAL AUTHENTICATION
@@ -118,7 +114,7 @@ Route::get('/insights/{slug}', [FrontendController::class, 'show'])
     ->where('slug', '[a-z0-9\-]+');
 
 Route::get('/blog/{slug}', function (string $slug) {
-    return redirect()->to('/insights/' . $slug, 301);
+    return redirect()->to('/insights/'.$slug, 301);
 })->name('blog.show')->where('slug', '[a-z0-9\-]+');
 
 // Page Detail
@@ -144,45 +140,21 @@ Route::get('/preview/content/{content}', [FrontendController::class, 'previewCon
     ->middleware('signed')
     ->name('content.preview');
 
-
-
 // Catch-all for other types (last!)
 /* Route::get('/{type}/{slug}', [FrontendController::class, 'show'])
     ->name('details.show')
     ->whereIn('type', ['testimonial', 'about', 'mission', 'vision', 'intro', 'blog', 'portfolio', 'service', 'page'])
     ->where('slug', '[a-z0-9\-]+'); */
 
-    
-
-
 // ===================================
 // SITEMAP & SEO ROUTES
 // ===================================
 
 // XML Sitemap (auto-regenerate if missing/outdated)
-Route::get('/sitemap.xml', function () {
-    $path = public_path('sitemap.xml');
-    $sitemapService = app(SitemapService::class);
-
-    if (!file_exists($path) || $sitemapService->needsRegeneration()) {
-        $sitemapService->generate();
-    }
-
-    if (!file_exists($path)) {
-        return response('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>', 200, [
-            'Content-Type' => 'application/xml',
-        ]);
-    }
-
-    return response()->file($path, ['Content-Type' => 'application/xml']);
-})->name('sitemap.xml');
+Route::get('/sitemap.xml', [SitemapController::class, 'xml'])->name('sitemap.xml');
 
 // Optional HTML sitemap page (for users)
-Route::get('/sitemap', function () {
-    $sitemapService = app(SitemapService::class);
-    $lastGenerated = $sitemapService->getLastGeneratedAt();
-    return view('sitemap', compact('lastGenerated'));
-})->name('sitemap');
+Route::get('/sitemap', [SitemapController::class, 'html'])->name('sitemap');
 
 // ===================================
 // AUTHENTICATION & 2FA ROUTES
@@ -207,6 +179,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         if ($user->isAdmin()) {
             return redirect()->route('admin.dashboard');
         }
+
         return view('user.dashboard');
     })->name('dashboard');
 
@@ -270,19 +243,7 @@ Route::middleware(['auth', 'verified', '2fa', 'admin.2fa', 'role:admin'])
         Route::get('/activity', [AdminActivityLogController::class, 'index'])->name('activity.index');
 
         // Sitemap Management
-        Route::post('/sitemap/generate', function () {
-            $sitemapService = app(SitemapService::class);
-            $success = $sitemapService->generate();
-
-            if ($success) {
-                // Optional: Ping search engines
-                // $sitemapService->pingSearchEngines();
-                return back()->with('success', 'Sitemap generated successfully!');
-            }
-
-            return back()->with('error', 'Failed to generate sitemap. Check logs.');
-        })->name('sitemap.generate');
-
+        Route::post('/sitemap/generate', [SitemapController::class, 'generate'])->name('sitemap.generate');
 
         Route::resource('redirects', AdminRedirectController::class)->except(['show']);
         Route::patch('redirects/{redirect}/toggle', [AdminRedirectController::class, 'toggle'])->name('redirects.toggle');
@@ -298,7 +259,7 @@ Route::middleware(['auth', 'verified', '2fa', 'admin.2fa', 'role:admin'])
 // API / AJAX ROUTES
 // ===================================
 Route::prefix('api')->name('api.')->middleware('web')->group(function () {
-    Route::post('/cta/click', [App\Http\Controllers\Api\CtaController::class, 'click'])
+    Route::post('/cta/click', [CtaController::class, 'click'])
         ->name('cta.click')
         ->middleware('throttle:100,1'); // 100 clicks per minute
 });
@@ -306,4 +267,4 @@ Route::prefix('api')->name('api.')->middleware('web')->group(function () {
 // ===================================
 // AUTH ROUTES (Laravel default)
 // ===================================
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

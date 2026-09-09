@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
-use App\Models\Content;
 use App\Http\Requests\ContentRequest;
+use App\Models\Content;
+use App\Models\Image;
 use App\Services\ContentService;
 use App\Services\ImageService;
 use App\Services\SeoService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\URL;
+use Illuminate\View\View;
 
 class ContentController extends Controller
 {
@@ -23,14 +24,14 @@ class ContentController extends Controller
 
     public function index(Request $request): View
     {
-        $query = Content::with(['creator', 'images' => fn($q) => $q->where('collection', 'featured')])
-            ->when($request->type, fn($q) => $q->where('type', $request->type))
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->when($request->search, fn($q) => $q->where('title', 'like', "%{$request->search}%"))
+        $query = Content::with(['creator', 'images' => fn ($q) => $q->where('collection', 'featured')])
+            ->when($request->type, fn ($q) => $q->where('type', $request->type))
+            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->when($request->search, fn ($q) => $q->where('title', 'like', "%{$request->search}%"))
             ->latest();
 
         $contents = $query->paginate(15)->appends($request->query());
-        $types = Content::TYPES;
+        $types = Content::typeLabels();
         $statuses = Content::STATUSES;
 
         return view('admin.content.index', compact('contents', 'types', 'statuses'));
@@ -38,8 +39,8 @@ class ContentController extends Controller
 
     public function create(): View
     {
-        $content = new Content();
-        $types = Content::TYPES;
+        $content = new Content;
+        $types = Content::typeLabels();
         $statuses = Content::STATUSES;
 
         return view('admin.content.create', compact('content', 'types', 'statuses'));
@@ -80,7 +81,7 @@ class ContentController extends Controller
     public function edit(Content $content): View
     {
         $content->load(['images', 'seoMetadata']);
-        $types = Content::TYPES;
+        $types = Content::typeLabels();
         $statuses = Content::STATUSES;
         $groupedImages = $this->imageService->groupImagesByUuid($content->images);
 
@@ -90,7 +91,7 @@ class ContentController extends Controller
     public function preview(Content $content): RedirectResponse
     {
         return redirect()->to(
-            \Illuminate\Support\Facades\URL::temporarySignedRoute(
+            URL::temporarySignedRoute(
                 'content.preview',
                 now()->addHours(2),
                 ['content' => $content->id]
@@ -117,7 +118,7 @@ class ContentController extends Controller
 
         // Update image alt text
         foreach ($request->input('image_alt', []) as $uuid => $altText) {
-            \App\Models\Image::where('imageable_type', Content::class)
+            Image::where('imageable_type', Content::class)
                 ->where('imageable_id', $content->id)
                 ->where('image_url', 'like', "%-{$uuid}-%")
                 ->update(['alt_text' => $altText ?: null]);
@@ -125,7 +126,7 @@ class ContentController extends Controller
 
         // Handle image deletions (from checkboxes) – UUIDs identify image groups
         $imageGroupUuidsToDelete = $request->input('images_to_delete', []);
-        if (!empty($imageGroupUuidsToDelete)) {
+        if (! empty($imageGroupUuidsToDelete)) {
             $this->imageService->deleteImageGroupByUuids($imageGroupUuidsToDelete);
         }
 
@@ -173,7 +174,7 @@ class ContentController extends Controller
                     file: $file,
                     folder: $folder,
                     slug: "{$slug}-gallery-{$index}",
-                    altText: $this->imageService->generateAltText($altBase, 'Gallery ' . ($index + 1)),
+                    altText: $this->imageService->generateAltText($altBase, 'Gallery '.($index + 1)),
                     modelClass: Content::class,
                     modelId: $content->id,
                     collection: 'gallery',

@@ -20,7 +20,7 @@ class ContentCacheManager
         $params['_bust'] = $this->contentCacheBuster();
         ksort($params);
 
-        return "content:{$this->cacheVersion()}:{$prefix}:" . md5(json_encode($params));
+        return "content:{$this->cacheVersion()}:{$prefix}:".md5(json_encode($params));
     }
 
     public function contentCacheBuster(): int
@@ -38,6 +38,13 @@ class ContentCacheManager
         return $initial;
     }
 
+    /**
+     * Remember a content fragment. Keys always include the global bust token via makeCacheKey().
+     * Pass $tags when the cached payload depends on a model group — on Redis/Memcached these
+     * enable targeted invalidation; on database cache the bust token still applies.
+     *
+     * @param  list<string>  $tags
+     */
     public function remember(string $key, \DateTimeInterface|\DateInterval|int $ttl, \Closure $callback, array $tags = []): mixed
     {
         if (! empty($tags) && $this->supportsTags()) {
