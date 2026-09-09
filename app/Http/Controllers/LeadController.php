@@ -91,6 +91,7 @@ class LeadController extends Controller
     public function markAsNotSpam(Lead $lead): RedirectResponse
     {
         $lead->update(['is_spam' => false]);
+        $lead->notifyAdmin();
 
         return back()->with('success', 'Lead unmarked as spam.');
     }
@@ -108,7 +109,10 @@ class LeadController extends Controller
 
         match ($request->action) {
             'mark_spam' => Lead::whereIn('id', $ids)->update(['is_spam' => true]),
-            'mark_not_spam' => Lead::whereIn('id', $ids)->update(['is_spam' => false]),
+            'mark_not_spam' => Lead::whereIn('id', $ids)->get()->each(function (Lead $lead): void {
+                $lead->update(['is_spam' => false]);
+                $lead->notifyAdmin();
+            }),
             'status' => Lead::whereIn('id', $ids)->update(['status' => $request->status]),
         };
 

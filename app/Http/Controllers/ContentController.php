@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ContentRequest;
 use App\Models\Content;
 use App\Models\Image;
+use App\Models\Tag;
 use App\Services\ContentService;
 use App\Services\ImageService;
 use App\Services\SeoService;
@@ -12,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ContentController extends Controller
@@ -42,8 +44,9 @@ class ContentController extends Controller
         $content = new Content;
         $types = Content::typeLabels();
         $statuses = Content::STATUSES;
+        $allTags = Tag::orderBy('name')->get(['id', 'name']);
 
-        return view('admin.content.create', compact('content', 'types', 'statuses'));
+        return view('admin.content.create', compact('content', 'types', 'statuses', 'allTags'));
     }
 
     public function store(ContentRequest $request): RedirectResponse
@@ -55,10 +58,7 @@ class ContentController extends Controller
             'created_by' => Auth::id(),
         ]);
 
-        // Sync tags if provided
-        if ($request->filled('tags')) {
-            $content->tags()->sync($request->tags);
-        }
+        $this->syncTags($request, $content);
 
         // Handle image uploads
         $this->handleImages($request, $content);
@@ -72,7 +72,7 @@ class ContentController extends Controller
 
     public function show(Content $content): View
     {
-        $content->load(['creator', 'images', 'seoMetadata', 'ctas', 'analytics']);
+        $content->load(['creator', 'images', 'seoMetadata', 'ctas', 'analytics', 'tags']);
         $groupedImages = $this->imageService->groupImagesByUuid($content->images);
 
         return view('admin.content.show', compact('content', 'groupedImages'));
@@ -80,12 +80,13 @@ class ContentController extends Controller
 
     public function edit(Content $content): View
     {
-        $content->load(['images', 'seoMetadata']);
+        $content->load(['images', 'seoMetadata', 'tags']);
         $types = Content::typeLabels();
         $statuses = Content::STATUSES;
+        $allTags = Tag::orderBy('name')->get(['id', 'name']);
         $groupedImages = $this->imageService->groupImagesByUuid($content->images);
 
-        return view('admin.content.edit', compact('content', 'types', 'statuses', 'groupedImages'));
+        return view('admin.content.edit', compact('content', 'types', 'statuses', 'allTags', 'groupedImages'));
     }
 
     public function preview(Content $content): RedirectResponse
@@ -103,12 +104,7 @@ class ContentController extends Controller
     {
         $content->update($request->validated());
 
-        // Sync tags
-        if ($request->filled('tags')) {
-            $content->tags()->sync($request->tags);
-        } else {
-            $content->tags()->detach();
-        }
+        $this->syncTags($request, $content);
 
         // Handle image uploads
         $this->handleImages($request, $content);
@@ -141,6 +137,28 @@ class ContentController extends Controller
 
         return redirect()->route('admin.content.index')
             ->with('success', 'Content deleted successfully.');
+    }
+
+    /**
+     * Sync the content's tags from the form: existing tag ids in `tags[]` plus
+     * any comma-separated names in `new_tags` (created on the fly).
+     */
+    private function syncTags(ContentRequest $request, Content $content): void
+    {
+        $ids = collect($request->input('tags', []))
+            ->filter()
+            ->map(fn ($id) => (int) $id);
+
+        collect(explode(',', (string) $request->input('new_tags', '')))
+            ->map(fn (string $name) => trim($name))
+            ->filter()
+            ->unique()
+            ->each(function (string $name) use ($ids): void {
+                $tag = Tag::firstOrCreate(['slug' => Str::slug($name)], ['name' => $name]);
+                $ids->push($tag->id);
+            });
+
+        $content->tags()->sync($ids->unique()->values()->all());
     }
 
     private function handleImages(ContentRequest $request, Content $content): void

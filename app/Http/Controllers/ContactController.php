@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\LeadRequest;
-use App\Mail\ContactReceived;
 use App\Models\Lead;
 use App\Models\PageAnalytic;
 use App\Models\Setting;
@@ -14,7 +13,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\View as ViewFacade;
 use Illuminate\View\View;
 
@@ -124,19 +122,7 @@ class ContactController extends Controller
         $lead = Lead::create($validated);
 
         if (! $lead->is_spam) {
-            try {
-                $adminEmail = Setting::get('admin_email', config('mail.from.address'));
-                if (config('queue.default') === 'sync') {
-                    Mail::to($adminEmail)->send(new ContactReceived($lead));
-                } else {
-                    Mail::to($adminEmail)->queue(new ContactReceived($lead));
-                }
-            } catch (\Throwable $e) {
-                Log::error('Contact email failed', [
-                    'error' => $e->getMessage(),
-                    'lead_id' => $lead->id ?? null,
-                ]);
-            }
+            $lead->notifyAdmin();
 
             if ($lead->source_content_id) {
                 $this->trackConversion($lead);

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Mail\ContactReceived;
 use App\Traits\Cacheable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -42,6 +45,7 @@ class Lead extends Model
         'spam_score' => 'integer',
         'spam_reasons' => 'array',
         'conversion_value' => 'decimal:2',
+        'admin_notified_at' => 'datetime',
     ];
 
     public const INQUIRY_TYPES = [
@@ -68,6 +72,35 @@ class Lead extends Model
     public function sourceContent(): BelongsTo
     {
         return $this->belongsTo(Content::class, 'source_content_id');
+    }
+
+    public function serviceContent(): BelongsTo
+    {
+        return $this->belongsTo(Content::class, 'service_content_id');
+    }
+
+    /**
+     * Queue the "new inquiry" email to the admin, once. Safe to call whenever a
+     * lead becomes visible/actionable — on submission, or when an admin clears
+     * a false-positive spam flag. No-op for spam leads or ones already sent.
+     */
+    public function notifyAdmin(): void
+    {
+        if ($this->is_spam || $this->admin_notified_at !== null) {
+            return;
+        }
+
+        try {
+            Mail::to(Setting::get('admin_email', config('mail.from.address')))
+                ->queue(new ContactReceived($this));
+
+            $this->forceFill(['admin_notified_at' => now()])->saveQuietly();
+        } catch (\Throwable $e) {
+            Log::error('Lead admin notification failed', [
+                'lead_id' => $this->id,
+                'error'   => $e->getMessage(),
+            ]);
+        }
     }
 
     // Scopes (DRY)

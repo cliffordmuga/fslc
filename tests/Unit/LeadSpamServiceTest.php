@@ -40,4 +40,15 @@ class LeadSpamServiceTest extends TestCase
         $this->assertLessThan(45, $result['score']);
         $this->assertFalse($service->isSpam($result['score']));
     }
+
+    public function test_is_spam_reads_the_threshold_from_config(): void
+    {
+        $service = app(LeadSpamService::class);
+
+        config(['forefront.lead_spam.threshold' => 45]);
+        $this->assertFalse($service->isSpam(30));
+
+        config(['forefront.lead_spam.threshold' => 25]);
+        $this->assertTrue($service->isSpam(30));
+    }
 }

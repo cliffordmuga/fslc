@@ -67,6 +67,17 @@
                         <label class="block text-sm font-medium text-neutral-700">Sort Order</label>
                         <p class="mt-1 text-sm text-neutral-900">{{ $content->sort_order }}</p>
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-neutral-700">Tags</label>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                            @forelse ($content->tags as $tag)
+                                <span
+                                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700">{{ $tag->name }}</span>
+                            @empty
+                                <p class="text-sm text-neutral-500">None</p>
+                            @endforelse
+                        </div>
+                    </div>
                 </div>
 
                 @if ($content->excerpt)

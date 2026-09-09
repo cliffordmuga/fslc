@@ -31,7 +31,10 @@ class ContentRequest extends FormRequest
             'excerpt' => ['nullable', 'string', 'max:500'],
             'content' => ['nullable', 'string'],
             'status' => ['required', Rule::in(array_keys(Content::STATUSES))],
-            'published_at' => ['nullable', 'date', 'after_or_equal:now'],
+            // `today` (not `now`) so the auto-filled now() for freshly published
+            // items in prepareForValidation() can't lose a race with the rule's
+            // own now() evaluation.
+            'published_at' => ['nullable', 'date', 'after_or_equal:today'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'images.*' => ['nullable', 'file', 'image', 'max:2048'],
             'featured_image' => ['nullable', 'file', 'image', 'max:2048'],
@@ -39,7 +42,8 @@ class ContentRequest extends FormRequest
             'image_alt' => ['nullable', 'array'],
             'image_alt.*' => ['nullable', 'string', 'max:255'],
             'tags' => ['nullable', 'array'],
-            'tags.*' => ['exists:tags,id'],
+            'tags.*' => ['integer', 'exists:tags,id'],
+            'new_tags' => ['nullable', 'string', 'max:255'],
 
             // SEO fields
             'meta_title' => ['nullable', 'string', 'max:60'],

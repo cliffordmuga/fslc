@@ -104,7 +104,7 @@ class LeadSpamService
 
     public function isSpam(int $score): bool
     {
-        return $score >= (int) env('LEAD_SPAM_THRESHOLD', 45);
+        return $score >= (int) config('forefront.lead_spam.threshold', 45);
     }
 
     /**

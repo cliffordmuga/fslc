@@ -5,6 +5,24 @@
  * Seeded into the database where applicable; safe to use without running seeders.
  */
 return [
+    /**
+     * Lead spam scoring. A submission with score >= threshold is stored with
+     * is_spam = true and never emails the admin. Kept in config (not read from
+     * env() directly) so it survives `config:cache` in production.
+     */
+    'lead_spam' => [
+        'threshold' => (int) env('LEAD_SPAM_THRESHOLD', 45),
+    ],
+
+    /**
+     * Funnel event retention. `lead-events:prune` (scheduled weekly) deletes
+     * lead_events rows older than this many days so the table stays bounded on
+     * shared hosting.
+     */
+    'lead_events' => [
+        'retention_days' => (int) env('LEAD_EVENTS_RETENTION_DAYS', 90),
+    ],
+
     'service_lead_config' => [
         'hmis-digital-health-solutions-kenya' => [
             'inquiry_type' => 'hmis-demo',

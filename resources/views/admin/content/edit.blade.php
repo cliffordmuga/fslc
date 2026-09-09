@@ -101,6 +101,8 @@
                         </div>
                     </div>
 
+                    @include('admin.content.partials.tags-field', ['selectedTagIds' => $content->tags->pluck('id')->all()])
+
                     <div>
                         <label for="excerpt" class="block text-sm font-medium text-neutral-700">Excerpt</label>
                         <textarea name="excerpt" id="excerpt" rows="3"

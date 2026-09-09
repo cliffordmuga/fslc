@@ -93,6 +93,9 @@
                         </div>
                     </div>
 
+                    <!-- Tags -->
+                    @include('admin.content.partials.tags-field', ['selectedTagIds' => []])
+
                     <!-- Excerpt -->
                     <div>
                         <label for="excerpt" class="block text-sm font-medium text-neutral-700">Excerpt</label>

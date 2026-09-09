@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Content;
 use App\Models\Image;
 use App\Models\Lead;
+use App\Models\LeadEvent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -142,6 +143,34 @@ class MaintenanceCommandsTest extends TestCase
         $this->assertTrue(Storage::disk('local')->exists('leads/current.pdf'));
         $this->assertSame('private copy', Storage::disk('local')->get('leads/current.pdf'));
         $this->assertTrue(Storage::disk('public')->exists('leads/current.pdf'));
+    }
+
+    public function test_prune_lead_events_deletes_rows_older_than_retention_window(): void
+    {
+        config(['forefront.lead_events.retention_days' => 90]);
+
+        $old = LeadEvent::create(['event' => 'view', 'page' => '/old']);
+        $old->forceFill(['created_at' => now()->subDays(120)])->saveQuietly();
+
+        $recent = LeadEvent::create(['event' => 'view', 'page' => '/recent']);
+        $recent->forceFill(['created_at' => now()->subDays(10)])->saveQuietly();
+
+        $this->artisan('lead-events:prune')->assertSuccessful();
+
+        $this->assertDatabaseMissing('lead_events', ['id' => $old->id]);
+        $this->assertDatabaseHas('lead_events', ['id' => $recent->id]);
+    }
+
+    public function test_prune_lead_events_days_option_overrides_config(): void
+    {
+        config(['forefront.lead_events.retention_days' => 365]);
+
+        $event = LeadEvent::create(['event' => 'view', 'page' => '/x']);
+        $event->forceFill(['created_at' => now()->subDays(45)])->saveQuietly();
+
+        $this->artisan('lead-events:prune', ['--days' => 30])->assertSuccessful();
+
+        $this->assertDatabaseMissing('lead_events', ['id' => $event->id]);
     }
 
     private function writeTinyJpeg(string $absolutePath): void
