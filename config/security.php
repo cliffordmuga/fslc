@@ -20,4 +20,11 @@ return [
      * Env: SECURITY_CSP_EXTRA_DIRECTIVES="frame-src ..."
      */
     'csp_extra_directives' => env('SECURITY_CSP_EXTRA_DIRECTIVES', ''),
+
+    /*
+     * CSP violation report handling (CspReportController). Kept here rather than
+     * read via env() at request time so overrides survive `config:cache`.
+     */
+    'csp_report_sample_percent' => (int) env('CSP_REPORT_SAMPLE_PERCENT', 10),
+    'csp_report_dedupe_seconds' => (int) env('CSP_REPORT_DEDUPE_SECONDS', 120),
 ];

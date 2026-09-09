@@ -48,7 +48,8 @@ class LeadSpamNotificationTest extends TestCase
             ->patch(route('admin.leads.not-spam', $lead))
             ->assertRedirect();
 
-        Mail::assertQueued(ContactReceived::class, 1);
+        // Single un-spam sends inline (no dependency on a running queue worker).
+        Mail::assertSent(ContactReceived::class, 1);
         $this->assertNotNull($lead->fresh()->admin_notified_at);
     }
 
@@ -61,7 +62,7 @@ class LeadSpamNotificationTest extends TestCase
         $lead->update(['is_spam' => true]);
         $this->actingAsAdmin()->patch(route('admin.leads.not-spam', $lead));
 
-        Mail::assertQueued(ContactReceived::class, 1);
+        Mail::assertSent(ContactReceived::class, 1);
     }
 
     public function test_non_spam_submission_marks_lead_notified(): void
@@ -79,7 +80,8 @@ class LeadSpamNotificationTest extends TestCase
 
         $this->assertFalse($lead->is_spam);
         $this->assertNotNull($lead->admin_notified_at);
-        Mail::assertQueued(ContactReceived::class, 1);
+        // Submission notifies inline so a stalled worker can't swallow a lead.
+        Mail::assertSent(ContactReceived::class, 1);
     }
 
     public function test_bulk_unmark_spam_notifies_each_lead(): void

@@ -80,25 +80,30 @@ class Lead extends Model
     }
 
     /**
-     * Queue the "new inquiry" email to the admin, once. Safe to call whenever a
-     * lead becomes visible/actionable — on submission, or when an admin clears
-     * a false-positive spam flag. No-op for spam leads or ones already sent.
+     * Send the "new inquiry" email to the admin, once. No-op for spam leads or
+     * ones already notified.
+     *
+     * $queue=false sends inline (used on form submission, so a stalled queue
+     * worker can't silently swallow a real lead); $queue=true defers it (bulk
+     * un-spam, where sending N emails inline would time out the request).
      */
-    public function notifyAdmin(): void
+    public function notifyAdmin(bool $queue = true): void
     {
         if ($this->is_spam || $this->admin_notified_at !== null) {
             return;
         }
 
         try {
-            Mail::to(Setting::get('admin_email', config('mail.from.address')))
-                ->queue(new ContactReceived($this));
+            $pending = Mail::to(Setting::get('admin_email', config('mail.from.address')));
+            $message = new ContactReceived($this);
+
+            $queue ? $pending->queue($message) : $pending->sendNow($message);
 
             $this->forceFill(['admin_notified_at' => now()])->saveQuietly();
         } catch (\Throwable $e) {
             Log::error('Lead admin notification failed', [
                 'lead_id' => $this->id,
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
     }

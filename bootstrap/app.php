@@ -57,10 +57,17 @@ return Application::configure(basePath: dirname(__DIR__))
         | Trusted Proxies — required on shared/cloud hosting behind load balancers.
         | Without this, Laravel can't detect HTTPS, breaking secure session cookies
         | and causing a login redirect loop on production.
+        |
+        | Default is '*' (trust any proxy). This is correct here: on cPanel /
+        | LiteSpeed the app is only reachable through the host's front end, which
+        | sets X-Forwarded-* itself. The old `null` default silently disabled
+        | proxy trust once `config:cache` ran (env() then returns null), causing
+        | exactly the redirect loop above. Narrow it by setting TRUSTED_PROXIES
+        | to a comma-separated IP/CIDR list in .env or via `SetEnv` in .htaccess.
         |--------------------------------------------------------------------------
         */
         $middleware->trustProxies(
-            at: env('TRUSTED_PROXIES', null),
+            at: env('TRUSTED_PROXIES') ?: '*',
             headers: \Illuminate\Http\Request::HEADER_X_FORWARDED_FOR
                    | \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST
                    | \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT

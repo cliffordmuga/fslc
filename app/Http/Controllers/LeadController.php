@@ -91,7 +91,7 @@ class LeadController extends Controller
     public function markAsNotSpam(Lead $lead): RedirectResponse
     {
         $lead->update(['is_spam' => false]);
-        $lead->notifyAdmin();
+        $lead->notifyAdmin(queue: false);
 
         return back()->with('success', 'Lead unmarked as spam.');
     }

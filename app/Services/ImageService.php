@@ -632,6 +632,10 @@ EOT;
      */
     protected function optimizeIfLocal(string $relativePath): void
     {
+        if (! config('image.optimize', true)) {
+            return;
+        }
+
         if (!class_exists('\Spatie\ImageOptimizer\OptimizerChainFactory')) {
             return;
         }

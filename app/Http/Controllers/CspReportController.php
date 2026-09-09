@@ -13,7 +13,7 @@ class CspReportController extends Controller
         $payload = $request->all();
 
         // Sampling: only log a % of reports (default 10%)
-        $samplePct = (int) env('CSP_REPORT_SAMPLE_PERCENT', 10);
+        $samplePct = (int) config('security.csp_report_sample_percent', 10);
         $samplePct = max(0, min(100, $samplePct));
 
         if ($samplePct < 100) {
@@ -30,7 +30,7 @@ class CspReportController extends Controller
             'p'  => $payload,
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
-        $dedupeSeconds = (int) env('CSP_REPORT_DEDUPE_SECONDS', 120);
+        $dedupeSeconds = (int) config('security.csp_report_dedupe_seconds', 120);
         $dedupeSeconds = max(10, min(3600, $dedupeSeconds));
 
         $key = "csp:report:{$hash}";

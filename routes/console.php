@@ -17,3 +17,6 @@ Schedule::command('queue:work --stop-when-empty --max-time=45')->everyMinute()->
 Schedule::command('sitemap:generate')->daily()->at('03:00');
 
 Schedule::command('lead-events:prune')->weekly()->sundays()->at('02:30');
+
+// Reclaim expired page-cache rows the database store never evicts on its own.
+Schedule::command('cache:prune-stale')->hourly();

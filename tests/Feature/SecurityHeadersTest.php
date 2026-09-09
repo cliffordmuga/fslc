@@ -51,7 +51,7 @@ class SecurityHeadersTest extends TestCase
     public function test_csp_report_endpoint_accepts_violation_payload(): void
     {
         Cache::flush();
-        putenv('CSP_REPORT_SAMPLE_PERCENT=100');
+        config(['security.csp_report_sample_percent' => 100]);
 
         $this->postJson(route('csp.report'), [
             'csp-report' => [

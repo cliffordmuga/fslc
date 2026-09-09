@@ -122,7 +122,7 @@ class ContactController extends Controller
         $lead = Lead::create($validated);
 
         if (! $lead->is_spam) {
-            $lead->notifyAdmin();
+            $lead->notifyAdmin(queue: false);
 
             if ($lead->source_content_id) {
                 $this->trackConversion($lead);
