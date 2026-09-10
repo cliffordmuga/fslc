@@ -69,6 +69,28 @@ php artisan route:list --compact
    APP_URL=https://forefrontsolutions.co.ke
    SESSION_SECURE_COOKIE=true
    QUEUE_CONNECTION=database
+   CACHE_STORE=database
+
+   # Logging — daily rotation + warning level so the log file can't fill your quota
+   LOG_CHANNEL=stack
+   LOG_STACK=daily
+   LOG_DAILY_DAYS=14
+   LOG_LEVEL=warning
+
+   # Trusted proxies — leave blank; it defaults to "*", which is correct on
+   # cPanel/LiteSpeed (PHP is only reachable via the host front end). Set a
+   # comma-separated IP/CIDR list only to narrow it.
+   TRUSTED_PROXIES=
+
+   # Image optimisation — set to false unless cPanel has the CLI binaries
+   # (jpegoptim, pngquant, optipng, svgo). With it true on a host that lacks
+   # them (or disables proc_open), every upload shells out ~6 times for nothing.
+   IMAGE_OPTIMIZE=false
+   ```
+   Optional tuning knobs (sane defaults, override only if needed):
+   ```
+   LEAD_SPAM_THRESHOLD=45          # score ≥ this ⇒ stored as spam, not emailed
+   LEAD_EVENTS_RETENTION_DAYS=90   # lead_events older than this are pruned weekly
    ```
 
 ---
@@ -224,7 +246,19 @@ ln -s /home/pwdfvylw/sitefolder/fslc/storage/app/public storage
    cd /home/pwdfvylw/sitefolder/fslc && php artisan schedule:run >> /dev/null 2>&1
    ```
 
-This runs the queue worker every minute and regenerates the XML sitemap daily (scheduled in `routes/console.php`).
+**One** crontab entry is all you need — `schedule:run` dispatches everything in
+`routes/console.php`:
+
+| Task | Frequency | Why it matters |
+|------|-----------|----------------|
+| `queue:work --stop-when-empty` | every minute | processes queued mail (bulk un-spam notifications) and `RegenerateSitemapJob` |
+| `sitemap:generate` | daily 03:00 | rebuilds `public/sitemap.xml` |
+| `cache:prune-stale` | hourly | deletes expired rows from the `cache` table (the database cache store never evicts stale page-cache keys on its own) |
+| `lead-events:prune` | weekly Sun 02:30 | trims the `lead_events` funnel table |
+
+> If the cron stops, the site still works — lead **submission** emails are sent
+> inline, not queued. Only bulk admin actions and sitemap regeneration wait on
+> the worker.
 
 ---
 
@@ -260,6 +294,10 @@ php artisan migrate --force
 php artisan config:cache && php artisan route:cache && php artisan view:cache
 ```
 
+> After uploading new files, always `composer dump-autoload -o` if the upload
+> added a class (new command, service, etc.) and you use the optimised
+> autoloader.
+
 ---
 
 ## Troubleshooting
@@ -273,7 +311,9 @@ php artisan config:cache && php artisan route:cache && php artisan view:cache
 | **Lead attachments** | Stored in `storage/app/private/leads/` (not web-accessible). Download via Admin → Leads → attachment link. Migrate legacy files: `php artisan leads:migrate-attachments` |
 | **Blur placeholders (LQIP)** | New uploads get blur automatically. Backfill existing CMS images: `php artisan images:backfill-blur` (requires GD) |
 | **419 Page Expired** | `APP_URL` doesn't match the actual domain; `SESSION_DOMAIN` misconfigured |
-| **Emails not sending** | Check Zoho SMTP credentials; `MAIL_EHLO_DOMAIN` must be your domain, not `localhost` |
+| **Redirect loop / "too many redirects" on HTTPS** | Proxy not trusted — Laravel thinks the request is plain HTTP. `TRUSTED_PROXIES` defaults to `*` which fixes this; if you set it explicitly, make sure it's `*` or includes the host's proxy. Then `php artisan config:cache`. |
+| **Emails not sending** | Check Zoho SMTP credentials; `MAIL_EHLO_DOMAIN` must be your domain, not `localhost`. Lead-submission emails send inline (not queued), so a failure here shows in `storage/logs`. |
+| **`cache` table growing large** | Confirm the hourly `cache:prune-stale` is running (via `schedule:run`). Manual: `php artisan cache:prune-stale`. |
 | **Maintenance mode stuck** | Delete `/home/pwdfvylw/sitefolder/fslc/storage/framework/maintenance.php` |
 
 ---
