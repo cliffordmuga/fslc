@@ -335,15 +335,15 @@ git is one-way and only moves what's actually tracked.
    **reuse the existing production DB credentials** from the old deployment's
    `.env` rather than creating a new database, so leads/content aren't
    orphaned — then `php artisan key:generate`, `php artisan storage:link`.
-3. **Build and place the frontend assets.** `public/build/` is gitignored,
-   so a fresh clone's copy is empty and the site will throw
-   `ViteManifestNotFoundException` until this is done — `.cpanel.yml`
-   doesn't build it for you (Node/npm availability on the account isn't
-   guaranteed). Locally: `npm run build`, then upload the resulting
-   `public/build/` folder into both `sitefolder/forefront/public/build/`
-   (so future deploys have something to copy from) and directly into
-   `public_html/build/` (so the live site is fixed immediately — don't wait
-   for a deploy run).
+3. **Frontend assets**: `public/build/` (compiled CSS/JS) is committed to
+   the repo, so a fresh clone already has it — nothing to build or upload by
+   hand at this step. (Earlier revisions of this doc had you build and
+   manually place `public/build/` in two locations; that's no longer
+   necessary — and was actively dangerous, since cPanel's "Deploy HEAD
+   Commit" does a clean checkout that silently wiped any manually-placed,
+   untracked file in the repo path, which is what caused
+   `ViteManifestNotFoundException` to keep coming back. See the note at the
+   end of this section for what to do when you change frontend code.)
 4. Open `.cpanel.yml` and confirm `DEPLOYPATH` matches your actual
    `public_html` path, and that `composer`/`php` resolve on this account
    (cPanel Terminal: `which composer`, `which php`; if either prints
@@ -369,14 +369,13 @@ build `vendor/` locally instead and upload it (Step 3a above), then re-run
 "Deploy HEAD Commit" to redo just the cache/migration tasks.
 
 **If a commit changes any CSS/JS/Blade component that affects the built
-bundle**, `npm run build` locally and re-upload `public/build/` (into the
-repo checkout and/or straight into `public_html/build/`) — the deploy script
-doesn't build it, and the `build/` rsync task has no `--delete`, so it won't
-remove stale files on its own either. (An earlier version of this script
-used `--delete`, and running it once against an empty source wiped the
-live site's working assets — that's fixed now, but the underlying gap —
-nothing builds `public/build/` automatically — remains, so this step is
-still manual.)
+bundle**, run `npm run build` locally and commit the resulting `public/build/`
+changes along with your source changes, then `git push` and deploy as usual —
+the deploy script doesn't build it for you, but since `public/build/` now
+travels with the repo, the normal clone/checkout/rsync flow carries it to
+`public_html/build/` automatically, no manual upload needed. Forgetting to
+rebuild before committing a frontend change is the only way this breaks —
+the manifest will just reference the previous build's output until you do.
 
 ---
 
@@ -386,7 +385,7 @@ still manual.)
 |---------|-----|
 | **500 error on every page** | Check `storage/` + `bootstrap/cache/` are writable (755/775); confirm `.env` exists; confirm `APP_KEY` is set |
 | **DB connection error** | Wrong DB host/user/password in `.env`; use `localhost` not `127.0.0.1` on cPanel |
-| **CSS/JS 404** | `public/build/manifest.json` missing — run `npm run build` locally and re-upload `public/build/` |
+| **CSS/JS 404 / ViteManifestNotFoundException** | `public/build/manifest.json` missing or stale — run `npm run build` locally, commit `public/build/`, push, and deploy (git-based deploys only; see "Git-based deploys" above) |
 | **Images not loading** | Run `php artisan storage:link` or manually create the `public_html/storage/` folder |
 | **Lead attachments** | Stored in `storage/app/private/leads/` (not web-accessible). Download via Admin → Leads → attachment link. Migrate legacy files: `php artisan leads:migrate-attachments` |
 | **Blur placeholders (LQIP)** | New uploads get blur automatically. Backfill existing CMS images: `php artisan images:backfill-blur` (requires GD) |

@@ -27,16 +27,17 @@
 # sessions/cache DB tables live in MySQL, not here), public_html/uploads/,
 # or the public_html/storage symlink. Only files tracked in this repo move.
 #
-# IMPORTANT — public/build/ (compiled CSS/JS) is gitignored, so a fresh
-# clone's public/build/ is empty until you run `npm run build` locally and
-# copy the result into the repo checkout (or onto the server) yourself; this
-# script does not build it (Node/npm availability on the account is not
-# guaranteed). The build/ rsync below deliberately has NO --delete: an
-# earlier version used --delete and, the first time this ran against an
-# empty public/build/ (before any build had ever happened), it wiped the
-# already-working compiled assets out of public_html/build/ and broke the
-# live site (ViteManifestNotFoundException). Without --delete, an empty or
-# stale source directory is a no-op instead of a destructive mirror.
+# IMPORTANT — public/build/ (compiled CSS/JS) is COMMITTED to this repo, not
+# gitignored. This host has no guaranteed Node/npm, and "Deploy HEAD Commit"
+# does a clean checkout that wipes any untracked file in the repo path
+# (including gitignored ones) — a manually-placed public/build/ was getting
+# silently deleted on every deploy, breaking the live site twice
+# (ViteManifestNotFoundException). Before any commit that changes
+# resources/{css,js}: run `npm run build` locally and commit the resulting
+# public/build/ so it survives the clean checkout and travels with the repo
+# automatically. The rsync below deliberately has NO --delete (a destructive
+# mirror that once wiped production assets when the source was briefly
+# empty) — an empty or stale source is now a no-op instead.
 #
 # IMPORTANT — public/.htaccess is only copied to $DEPLOYPATH when no
 # .htaccess exists there yet. public_html/.htaccess carries the
