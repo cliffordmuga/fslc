@@ -37,11 +37,20 @@
 # already-working compiled assets out of public_html/build/ and broke the
 # live site (ViteManifestNotFoundException). Without --delete, an empty or
 # stale source directory is a no-op instead of a destructive mirror.
+#
+# IMPORTANT — public/.htaccess is only copied to $DEPLOYPATH when no
+# .htaccess exists there yet. public_html/.htaccess carries the
+# server-specific `SetEnv APP_LARAVEL_PATH ...` line added by hand after the
+# first deploy (see step 3 below); the committed public/.htaccess never has
+# that line, so an unconditional `cp -f` on every deploy was clobbering it
+# and breaking the live site (PHP can't find vendor/autoload.php -> 500). If
+# public/.htaccess changes and you need the new version live, copy it up
+# manually and re-add the SetEnv line — don't remove the `test -f` guard.
 deployment:
   tasks:
     - export DEPLOYPATH=/home/pwdfvylw/public_html/
     - /bin/cp -f public/index.php $DEPLOYPATH
-    - /bin/cp -f public/.htaccess $DEPLOYPATH
+    - test -f $DEPLOYPATH/.htaccess || /bin/cp -f public/.htaccess $DEPLOYPATH
     - /bin/cp -f public/favicon.ico $DEPLOYPATH 2>/dev/null || true
     - /bin/cp -f public/robots.txt $DEPLOYPATH 2>/dev/null || true
     - /bin/rsync -a public/build/ $DEPLOYPATH/build/
