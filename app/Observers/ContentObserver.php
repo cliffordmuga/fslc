@@ -40,8 +40,9 @@ class ContentObserver
 
     public function saved(Content $content): void
     {
-        // Regenerate sitemap when content is published or URL-impacting fields change
-        if ($content->status === 'published') {
+        // Regenerate sitemap when content is published, or when it just left the
+        // published state (e.g. draft) — the sitemap needs to drop the URL either way.
+        if ($content->status === 'published' || $content->wasChanged('status')) {
             RegenerateSitemapJob::dispatch()->onQueue('default');
         }
 
