@@ -77,6 +77,13 @@
     <FilesMatch "^sitemap\.xml$">
         Header set Cache-Control "public, max-age=3600"
     </FilesMatch>
+
+    # Strip the PHP version fingerprint (set by PHP's expose_php ini, not
+    # Laravel) on every response. The Apache "Server" header can't be
+    # suppressed from .htaccess — Header unset doesn't reach it — that needs
+    # ServerTokens Prod in the host's main config, which shared hosting rarely
+    # exposes; ask the host to set it if the version string is a concern.
+    Header unset X-Powered-By
 </IfModule>
 
 # ---------------------------------------------------------------------------
