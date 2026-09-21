@@ -280,6 +280,11 @@ Visit these URLs and verify they work:
 
 ## Updating the site (re-deployments)
 
+**Prefer the git-based deploy below** — it replaces manual file uploads and
+removes the "which files did I change" guesswork. The steps here are the
+fallback for hosts without cPanel's Git Version Control feature, or for a
+one-off manual patch.
+
 For most changes:
 ```bash
 # 1. Upload changed files
@@ -297,6 +302,56 @@ php artisan config:cache && php artisan route:cache && php artisan view:cache
 > After uploading new files, always `composer dump-autoload -o` if the upload
 > added a class (new command, service, etc.) and you use the optimised
 > autoloader.
+
+---
+
+## Git-based deploys (recommended)
+
+`.cpanel.yml` at the repo root drives cPanel's **Git Version Control**
+feature: it copies the built-in `public/` assets into `public_html/`, runs
+`composer install --no-dev`, migrations, and the same cache-rebuild steps as
+the manual process — as one clicked action instead of a file-by-file upload.
+It never touches `.env`, `storage/`, `vendor/`, `public_html/uploads/`, or the
+`public_html/storage` symlink; only files tracked in git move.
+
+**Why this over a raw folder sync (rsync/WinSCP mirror, FTP mirror tools):** a
+two-way sync between your local project and the server would overwrite the
+server's `.env` (DB credentials, `APP_URL`, `APP_DEBUG`) with your local dev
+values, and could delete server-only files a mirror doesn't know about
+(uploaded lead attachments, CMS images, the storage symlink). Deploying from
+git is one-way and only moves what's actually tracked.
+
+### One-time setup
+
+1. cPanel → **Git Version Control** → **Create**.
+   - Clone URL: `https://github.com/cliffordmuga/fslc.git`
+   - Repository Path: `/home/pwdfvylw/sitefolder/fslc` — the same Laravel
+     root path used throughout this doc, **not** `public_html/`.
+   - Branch: `main`.
+2. In that directory (cPanel Terminal, or File Manager if no Terminal):
+   copy `.env.example` → `.env`, fill in production values (Step 1 above),
+   `php artisan key:generate`, `php artisan storage:link`.
+3. Open `.cpanel.yml` and confirm `DEPLOYPATH` matches your actual
+   `public_html` path, and that `composer`/`php` resolve on this account
+   (cPanel Terminal: `which composer`, `which php`; if either prints
+   nothing, use the full `/opt/cpanel/...` path cPanel's docs give you and
+   edit the task lines accordingly).
+4. Run migrations once by hand the first time (`php artisan migrate --force`)
+   so the deploy user's DB permissions are confirmed working before you rely
+   on the automated task.
+
+### Every deploy after that
+
+```bash
+git push origin main            # from your local machine, as usual
+```
+Then in cPanel → Git Version Control → this repo → **Manage** → **Update from
+Remote** (pulls the new commits) → **Deploy HEAD Commit** (runs the
+`.cpanel.yml` tasks: copy public assets, `composer install --no-dev`,
+`migrate --force`, cache rebuild, `sitemap:generate`). Watch the task output
+in the cPanel UI — if `composer install` fails on a memory-constrained plan,
+build `vendor/` locally instead and upload it (Step 3a above), then re-run
+"Deploy HEAD Commit" to redo just the cache/migration tasks.
 
 ---
 

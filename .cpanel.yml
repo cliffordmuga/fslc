@@ -1,0 +1,43 @@
+---
+# cPanel "Git Version Control" deploy script.
+#
+# Setup (one-time, in cPanel — see DEPLOYMENT.md "Git-based deploys" for the
+# full walkthrough):
+#   1. cPanel → Git Version Control → Create.
+#      Repository Path: /home/pwdfvylw/sitefolder/fslc   (the Laravel root —
+#      same path DEPLOYMENT.md already uses; NOT public_html/).
+#      Clone URL: https://github.com/cliffordmuga/fslc.git, branch: main.
+#   2. .env stays hand-managed on the server (it's gitignored — a `git pull`
+#      here never touches it, same for storage/, vendor/, node_modules/).
+#   3. After the FIRST clone only: copy .env.example -> .env, fill in
+#      production values, `php artisan key:generate`, `php artisan migrate`,
+#      `php artisan storage:link`. Routine deploys after that just need step 4.
+#   4. Every deploy: cPanel → Git Version Control → your repo → "Manage" ->
+#      pull latest, then "Deploy HEAD Commit". That runs the tasks below.
+#
+# Each task is a plain shell command run with the repo checkout as the
+# working directory — NOT a full CI environment (no conditionals). Update
+# DEPLOYPATH and the PHP binary path for your account before first deploy
+# (cPanel → MultiPHP Manager shows the exact ea-phpXX path; `which composer`
+# in cPanel Terminal shows the composer path if it isn't on PATH already).
+#
+# This intentionally does NOT touch: .env, storage/ (uploads, logs, the
+# sessions/cache DB tables live in MySQL, not here), public_html/uploads/,
+# or the public_html/storage symlink. Only files tracked in this repo move.
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/pwdfvylw/public_html/
+    - /bin/cp -f public/index.php $DEPLOYPATH
+    - /bin/cp -f public/.htaccess $DEPLOYPATH
+    - /bin/cp -f public/favicon.ico $DEPLOYPATH 2>/dev/null || true
+    - /bin/cp -f public/robots.txt $DEPLOYPATH 2>/dev/null || true
+    - /bin/rsync -a --delete public/build/ $DEPLOYPATH/build/
+    - /bin/rsync -a public/images/ $DEPLOYPATH/images/
+    - /bin/rsync -a public/plugins/ $DEPLOYPATH/plugins/
+    - composer install --no-dev --optimize-autoloader --no-interaction
+    - php artisan migrate --force
+    - php artisan config:cache
+    - php artisan route:cache
+    - php artisan view:cache
+    - php artisan event:cache
+    - php artisan sitemap:generate
