@@ -325,20 +325,35 @@ git is one-way and only moves what's actually tracked.
 
 1. cPanel → **Git Version Control** → **Create**.
    - Clone URL: `https://github.com/cliffordmuga/fslc.git`
-   - Repository Path: `/home/pwdfvylw/sitefolder/fslc` — the same Laravel
-     root path used throughout this doc, **not** `public_html/`.
+   - Repository Path: `/home/pwdfvylw/sitefolder/forefront` — a **fresh,
+     empty** directory; `git clone` refuses a non-empty target, so this
+     can't be `sitefolder/fslc` if that already holds an old hand-uploaded
+     copy. Not `public_html/` either way.
    - Branch: `main`.
 2. In that directory (cPanel Terminal, or File Manager if no Terminal):
-   copy `.env.example` → `.env`, fill in production values (Step 1 above),
-   `php artisan key:generate`, `php artisan storage:link`.
-3. Open `.cpanel.yml` and confirm `DEPLOYPATH` matches your actual
+   copy `.env.example` → `.env`, fill in production values (Step 1 above) —
+   **reuse the existing production DB credentials** from the old deployment's
+   `.env` rather than creating a new database, so leads/content aren't
+   orphaned — then `php artisan key:generate`, `php artisan storage:link`.
+3. **Build and place the frontend assets.** `public/build/` is gitignored,
+   so a fresh clone's copy is empty and the site will throw
+   `ViteManifestNotFoundException` until this is done — `.cpanel.yml`
+   doesn't build it for you (Node/npm availability on the account isn't
+   guaranteed). Locally: `npm run build`, then upload the resulting
+   `public/build/` folder into both `sitefolder/forefront/public/build/`
+   (so future deploys have something to copy from) and directly into
+   `public_html/build/` (so the live site is fixed immediately — don't wait
+   for a deploy run).
+4. Open `.cpanel.yml` and confirm `DEPLOYPATH` matches your actual
    `public_html` path, and that `composer`/`php` resolve on this account
    (cPanel Terminal: `which composer`, `which php`; if either prints
    nothing, use the full `/opt/cpanel/...` path cPanel's docs give you and
    edit the task lines accordingly).
-4. Run migrations once by hand the first time (`php artisan migrate --force`)
+5. Run migrations once by hand the first time (`php artisan migrate --force`)
    so the deploy user's DB permissions are confirmed working before you rely
    on the automated task.
+6. **The cutover**: edit `public_html/.htaccess`'s `SetEnv APP_LARAVEL_PATH`
+   to point at the new path, then reload the site to confirm.
 
 ### Every deploy after that
 
@@ -352,6 +367,16 @@ Remote** (pulls the new commits) → **Deploy HEAD Commit** (runs the
 in the cPanel UI — if `composer install` fails on a memory-constrained plan,
 build `vendor/` locally instead and upload it (Step 3a above), then re-run
 "Deploy HEAD Commit" to redo just the cache/migration tasks.
+
+**If a commit changes any CSS/JS/Blade component that affects the built
+bundle**, `npm run build` locally and re-upload `public/build/` (into the
+repo checkout and/or straight into `public_html/build/`) — the deploy script
+doesn't build it, and the `build/` rsync task has no `--delete`, so it won't
+remove stale files on its own either. (An earlier version of this script
+used `--delete`, and running it once against an empty source wiped the
+live site's working assets — that's fixed now, but the underlying gap —
+nothing builds `public/build/` automatically — remains, so this step is
+still manual.)
 
 ---
 

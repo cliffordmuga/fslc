@@ -4,8 +4,10 @@
 # Setup (one-time, in cPanel — see DEPLOYMENT.md "Git-based deploys" for the
 # full walkthrough):
 #   1. cPanel → Git Version Control → Create.
-#      Repository Path: /home/pwdfvylw/sitefolder/fslc   (the Laravel root —
-#      same path DEPLOYMENT.md already uses; NOT public_html/).
+#      Repository Path: /home/pwdfvylw/sitefolder/forefront   (the Laravel
+#      root — NOT public_html/). Must be created fresh/empty; git clone
+#      refuses a non-empty target, which is why this isn't sitefolder/fslc
+#      (that path already held the old hand-uploaded deployment).
 #      Clone URL: https://github.com/cliffordmuga/fslc.git, branch: main.
 #   2. .env stays hand-managed on the server (it's gitignored — a `git pull`
 #      here never touches it, same for storage/, vendor/, node_modules/).
@@ -24,6 +26,17 @@
 # This intentionally does NOT touch: .env, storage/ (uploads, logs, the
 # sessions/cache DB tables live in MySQL, not here), public_html/uploads/,
 # or the public_html/storage symlink. Only files tracked in this repo move.
+#
+# IMPORTANT — public/build/ (compiled CSS/JS) is gitignored, so a fresh
+# clone's public/build/ is empty until you run `npm run build` locally and
+# copy the result into the repo checkout (or onto the server) yourself; this
+# script does not build it (Node/npm availability on the account is not
+# guaranteed). The build/ rsync below deliberately has NO --delete: an
+# earlier version used --delete and, the first time this ran against an
+# empty public/build/ (before any build had ever happened), it wiped the
+# already-working compiled assets out of public_html/build/ and broke the
+# live site (ViteManifestNotFoundException). Without --delete, an empty or
+# stale source directory is a no-op instead of a destructive mirror.
 deployment:
   tasks:
     - export DEPLOYPATH=/home/pwdfvylw/public_html/
@@ -31,7 +44,7 @@ deployment:
     - /bin/cp -f public/.htaccess $DEPLOYPATH
     - /bin/cp -f public/favicon.ico $DEPLOYPATH 2>/dev/null || true
     - /bin/cp -f public/robots.txt $DEPLOYPATH 2>/dev/null || true
-    - /bin/rsync -a --delete public/build/ $DEPLOYPATH/build/
+    - /bin/rsync -a public/build/ $DEPLOYPATH/build/
     - /bin/rsync -a public/images/ $DEPLOYPATH/images/
     - /bin/rsync -a public/plugins/ $DEPLOYPATH/plugins/
     - composer install --no-dev --optimize-autoloader --no-interaction
