@@ -46,7 +46,7 @@ php artisan forefront:generate-brand-assets
 
 `DEPLOYMENT.md` is authoritative. Key points that affect how code must behave:
 
-- The Laravel root is uploaded **above** `public_html/`; the contents of `public/` go **into** `public_html/`. `public/.htaccess` carries a server-specific `RewriteBase /` and `SetEnv APP_LARAVEL_PATH ...` that must **not** be committed.
+- The Laravel root is uploaded **above** `public_html/`; the contents of `public/` go **into** `public_html/`. `public/.htaccess` has no `RewriteBase` (Apache derives it from the physical docroot, so the same line works local or in production) — the one line that's still server-specific and must **not** be committed is `SetEnv APP_LARAVEL_PATH ...`.
 - `composer deploy` runs `config:cache route:cache view:cache event:cache` + `sitemap:generate`. Anything read from `env()` outside a `config/` file will be null once config is cached — always go through `config()`.
 - No SSH assumed. Caches are cleared in production via `GET /clear-cache?token=<CLEAR_CACHE_TOKEN>`. That route is defined in `bootstrap/app.php` (not `routes/web.php`) specifically so it works with **no session/cache DB tables present**; keep it dependency-free.
 - Cron runs `php artisan schedule:run` every minute → `queue:work --stop-when-empty --max-time=45` (processes queued mail), daily `sitemap:generate`, weekly `lead-events:prune` (`routes/console.php`).

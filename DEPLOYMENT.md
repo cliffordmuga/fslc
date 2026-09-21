@@ -97,23 +97,23 @@ php artisan route:list --compact
 
 ## Step 2 — Edit public/.htaccess before uploading
 
-Open `public/.htaccess` locally and:
+`public/.htaccess` deliberately carries **no `RewriteBase`** — Apache derives
+the base from the physical directory holding the file, so the committed line
+works unmodified whether the docroot is a subdirectory (local Laragon:
+`/fslc/public`) or the domain root (production: `public_html/`). Nothing to
+edit here for routing. (An earlier version hardcoded `RewriteBase /fslc/public`
+with instructions to change it before every upload and revert it after — that
+edit-then-revert-every-deploy pattern is exactly the kind of step that gets
+skipped or done backwards, and is the likely cause of at least one past
+broken-link/asset-URL production incident.)
 
-**2a. Change RewriteBase to the domain root:**
-```apache
-RewriteBase /
-```
-The default `/fslc/public` is for local Laragon subdirectory dev only. Leaving
-it as-is on production makes every non-homepage URL (e.g. `/about`) 404 at the
-Apache level — the front controller rewrite resolves to a filesystem path
-that doesn't exist, even though `/` itself still loads via `DirectoryIndex`.
-
-**2b. Uncomment and set the APP_LARAVEL_PATH line:**
+**Uncomment and set the APP_LARAVEL_PATH line** (this one genuinely is
+server-specific — there's no way to infer a cPanel username):
 ```apache
 SetEnv APP_LARAVEL_PATH /home/pwdfvylw/sitefolder/fslc
 ```
 
-**2c. (Optional) Uncomment the HTTPS redirect:**
+**(Optional) Uncomment the HTTPS redirect:**
 ```apache
 RewriteCond %{HTTPS} off
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
@@ -122,8 +122,8 @@ Not required for correctness — `App\Http\Middleware\ForceHttps` already redire
 http → https automatically whenever `APP_ENV=production`. Uncommenting this is
 only a minor optimisation (redirects before PHP boots).
 
-> Do not commit the RewriteBase/APP_LARAVEL_PATH changes. They're server-specific.
-> After deploying, revert them locally so local dev keeps working.
+> Do not commit the APP_LARAVEL_PATH change — it's server-specific. Revert it
+> locally after deploying so local dev keeps working.
 
 ---
 

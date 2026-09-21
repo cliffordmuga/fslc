@@ -5,16 +5,16 @@
 
     RewriteEngine On
 
-    # Local dev (Laragon subdirectory install, e.g. http://localhost/fslc/public).
-    # -------------------------------------------------------------------------
-    # SHARED HOSTING: change this to "RewriteBase /" before uploading.
-    # public_html/ serves from the domain root there, not a /fslc/public
-    # subdirectory — leaving this as-is makes every non-homepage URL 404 at
-    # the Apache level (front controller rewrite resolves to a filesystem
-    # path that doesn't exist), even though "/" itself loads fine via
-    # DirectoryIndex.
-    # -------------------------------------------------------------------------
-    RewriteBase /fslc/public
+    # No RewriteBase — vanilla Laravel doesn't set one, and it shouldn't be
+    # set here either. Apache derives the base from the physical directory
+    # holding this file, so the same line works whether the docroot is a
+    # subdirectory (local: /fslc/public) or the domain root (production:
+    # public_html/). A previous version hardcoded "RewriteBase /fslc/public"
+    # with a comment to change it before uploading — exactly the kind of
+    # manual per-environment edit that's easy to forget, and is the likely
+    # cause of past broken-link/asset-URL deploys. Verified locally: every
+    # route (/, nested slugs, static assets, 404s) still resolves correctly
+    # without it.
 
     # -------------------------------------------------------------------------
     # SHARED HOSTING: path to the Laravel project root (outside public_html/).
