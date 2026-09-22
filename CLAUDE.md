@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Laravel 12 marketing/portfolio CMS for **Forefront Solutions (K) Ltd** (forefrontsolutions.co.ke) — HMIS/digital-health consultancy positioning, an insights hub, lead capture, and an admin content manager. Blade + Alpine.js + Tailwind on the front; TinyMCE in admin. Target host is a **self-managed VPS** (Nginx, PHP-FPM 8.3, Redis) — cache, session, and queue all use the `redis` driver by default (`config/cache.php` falls back to `file`/`database` automatically if the redis extension isn't available, so `composer test`/local dev without Redis still works).
+Laravel 12 marketing/portfolio CMS for **Forefront Solutions (K) Ltd** (forefrontsolutions.co.ke) — HMIS/digital-health consultancy positioning, an insights hub, lead capture, and an admin content manager. Blade + Alpine.js + Tailwind on the front; TinyMCE in admin. Target host is a **self-managed VPS** (Nginx, PHP-FPM 8.3). `config/cache.php`/`.env.example` default new installs to `redis` for cache/session/queue (falling back to `file`/`database` automatically if the redis extension isn't available), but the **live production `.env` is still on `database`** as of this writing — see "Live status" under Deployment for the actual current state and why.
 
 ## Commands
 
@@ -49,8 +49,41 @@ php artisan forefront:generate-brand-assets
 - Standard Laravel layout on the VPS — `public/` is the Nginx docroot directly (`/var/www/forefront/public`), no split-directory indirection. `public/index.php` is stock Laravel; don't reintroduce path-resolution hacks.
 - `composer deploy` runs `config:cache route:cache view:cache event:cache` + `sitemap:generate`. Anything read from `env()` outside a `config/` file will be null once config is cached — always go through `config()`.
 - Caches can also be cleared without SSH via `GET /clear-cache?token=<CLEAR_CACHE_TOKEN>`. That route is defined in `bootstrap/app.php` (not `routes/web.php`) specifically so it works with **no session/cache DB tables present**; keep it dependency-free.
-- Cron runs `php artisan schedule:run` every minute for scheduled *jobs* (daily `sitemap:generate`, weekly `lead-events:prune`, hourly `cache:prune-stale`) — see `routes/console.php`. Queue *processing* is a separate, persistent `queue:work redis` worker under systemd (`deploy/systemd/forefront-queue.service`), not cron-triggered; restart it (`systemctl restart forefront-queue` or `php artisan queue:restart`) after any deploy that changes queued job code.
+- Cron runs `php artisan schedule:run` every minute for scheduled *jobs* (daily `sitemap:generate`, weekly `lead-events:prune`, hourly `cache:prune-stale`) — see `routes/console.php`. Queue *processing* is a separate, persistent worker, not cron-triggered — in production that's **Supervisor**, program group `forefront-worker` (restart with `sudo supervisorctl restart forefront-worker:*` — the `:*` matters, see "Live status" below); `deploy/systemd/forefront-queue.service` is a reference unit that was never actually installed. Restart after any deploy that changes queued job code (`php artisan queue:restart` also works, without a full process restart).
 - **Deploy**: `scripts/sync-production.sh` commits + pushes to a `production` git remote (bare repo on the VPS); a server-side `post-receive` hook does a delta `git checkout -f`, `composer install --no-dev`, conditional asset rebuild, `migrate --force`, cache rebuild, and a queue-worker restart, wrapped in maintenance mode. `deploy/nginx/forefront.conf` and `deploy/systemd/forefront-queue.service` are reference configs for the server side, not auto-applied by the deploy script.
+
+### Live status (as of 2026-09-22)
+
+Deployed and live at `https://forefrontsolutions.co.ke` (+`www`), on the same
+Hetzner VPS as `khmis.fsl.co.ke` (178.105.20.188) and `erp.fsl.co.ke`. Migrated
+from a previous cPanel host — the cPanel DB was dumped and imported into
+`forefront_db` before the first VPS deploy, so real production data (leads,
+content, users) carried over. The old cPanel hosting is still around as a
+rollback safety net; decommission it once the VPS instance has been confirmed
+stable for a while.
+
+Three things differ from what's described above/in `DEPLOYMENT.md` —
+worth a deliberate decision, not just aligning the docs to match:
+
+- **Cache/session/queue are on `database`, not `redis`**, in the actual
+  production `.env` — matches `.env.example`'s safer default ("Redis optional
+  at scale — do not switch unless infra supports it"), not the "Redis by
+  default" claim in the paragraph above. Infra *does* support it now (a
+  shared, unauthenticated Redis instance is already running on the VPS for
+  khmis) — switching is straightforward whenever it's actually wanted.
+- **Queue worker runs under Supervisor**, not the systemd unit
+  (`deploy/systemd/forefront-queue.service` was never installed). Restart
+  with `sudo supervisorctl restart forefront-worker:*` — note the `:*`
+  suffix is required; a bare `restart forefront-worker` (or `start`) fails
+  with "no such process" when Supervisor has the group in a `FATAL` state
+  (e.g. right after a fresh provision, before the app's `artisan` file
+  exists for the first time).
+- **`www` is not redirected to the apex domain** — both serve identical
+  content directly, unlike `deploy/nginx/forefront.conf`'s reference config
+  which 301s `www` → apex.
+
+Also still open: `CLEAR_CACHE_TOKEN` is unset in production `.env`, so the
+`/clear-cache?token=…` route described above won't work until it's set.
 
 ## Architecture
 
@@ -83,7 +116,7 @@ Tags (`content_tag` pivot) are edited from the content create/edit forms via the
 | Layer | Where | Invalidation |
 |---|---|---|
 | Full-page HTML | `PublicPageCache` middleware | TTL (`public_page_cache.ttl_seconds`, default 120s) + global buster. Key = `md5(buster \| locale \| device \| path \| allow-listed sorted query)`. Skips authenticated users, admin/auth/form/api paths. `?nocache=1` bypasses. Adds `X-Page-Cache: HIT/MISS/SKIP/BYPASS`. |
-| Query/fragment cache | `ContentService` via `ContentCacheManager` | Tag-based (active now that `CACHE_STORE=redis`; degrades to plain keys if the store falls back to `database`/`file`) + `cacheVersion()` + content buster. |
+| Query/fragment cache | `ContentService` via `ContentCacheManager` | Tag-based on `redis`/`memcached`, degrades to plain keys on `database`/`file` (currently active in production — see "Live status" under Deployment) + `cacheVersion()` + content buster. |
 | Model cache keys/tags | `Cacheable` trait | `saved`/`deleted` model events call `getCacheKeys()` / `getCacheTags()`. Pattern clearing is redis-only and off by default. |
 | SEO fields | `Seoable` trait | Per-model `seo:<class>:<id>:*` keys, busted on `saved`/`deleted`. |
 | Admin sidebar / dashboard | `App\Support\AdminUiCache` | Explicit `forget*` calls from observers. |

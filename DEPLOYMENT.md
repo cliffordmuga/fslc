@@ -66,6 +66,10 @@ CACHE_STORE=redis
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 REDIS_PASSWORD=<set one — don't leave Redis unauthenticated even on localhost-only binding>
+# NOTE: production's actual .env is still on `database` for all three as of
+# this writing — infra supports redis (a shared instance already runs on
+# this VPS for khmis) but nobody's flipped the switch yet. See "Live status"
+# in CLAUDE.md before assuming either state.
 
 # Logging — daily rotation + warning level
 LOG_CHANNEL=stack
@@ -91,24 +95,27 @@ LEAD_EVENTS_RETENTION_DAYS=90   # lead_events older than this are pruned weekly
 
 ---
 
-## Queue worker (systemd)
+## Queue worker (Supervisor)
 
 Queue processing runs as a persistent worker, not the cron-triggered burst
-job used on shared hosting:
+job used on shared hosting. In production this runs under **Supervisor**,
+program group `forefront-worker`:
 
 ```bash
-sudo cp deploy/systemd/forefront-queue.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now forefront-queue
+sudo supervisorctl restart forefront-worker:*
 ```
 
-Restart after any deploy that changes queued job code (the `post-receive`
-hook is expected to do this automatically — verify it does):
-```bash
-sudo systemctl restart forefront-queue
-# or, without a full process restart:
-php artisan queue:restart
-```
+The `:*` suffix is required — it targets the whole numprocs group. A bare
+`restart forefront-worker` (or `start`) fails with "no such process" if
+Supervisor has the group in a `FATAL` state (e.g. right after a fresh
+provision, before `artisan` existed yet). The `post-receive` hook is expected
+to restart this automatically after every deploy; verify it does if queued
+jobs stop processing.
+
+`deploy/systemd/forefront-queue.service` is a **reference** unit for hosts
+that use systemd instead of Supervisor — it was never actually installed on
+the current VPS, so don't assume `systemctl restart forefront-queue` does
+anything there.
 
 ---
 
@@ -168,7 +175,7 @@ no cache/session tables migrated. Keep `CLEAR_CACHE_TOKEN` secret.
 | **419 Page Expired** | `APP_URL` doesn't match the actual domain; `SESSION_DOMAIN` misconfigured |
 | **Redirect loop / "too many redirects" on HTTPS** | `TRUSTED_PROXIES` misconfigured — see the comment in `bootstrap/app.php`. Then `php artisan config:cache`. |
 | **Emails not sending** | Check SMTP credentials; `MAIL_EHLO_DOMAIN` must be your domain, not `localhost`. Lead-submission emails send inline (not queued), so a failure here shows in `storage/logs` |
-| **Queued jobs not processing** | Check the systemd worker is running: `systemctl status forefront-queue`. Restart if it crashed: `systemctl restart forefront-queue` |
+| **Queued jobs not processing** | Check the Supervisor worker: `sudo supervisorctl status forefront-worker:*`. Restart if crashed/FATAL: `sudo supervisorctl restart forefront-worker:*` (the `:*` is required) |
 | **Sitemap not reflecting a content change** | `SitemapController::xml()` self-heals based on a 24h cache timestamp, not content freshness — hit `/clear-cache` to force a check, or wait for the daily `sitemap:generate` cron |
 | **Maintenance mode stuck** | Delete `/var/www/forefront/storage/framework/maintenance.php` |
 
