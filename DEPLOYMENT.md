@@ -176,7 +176,8 @@ no cache/session tables migrated. Keep `CLEAR_CACHE_TOKEN` secret.
 | **Redirect loop / "too many redirects" on HTTPS** | `TRUSTED_PROXIES` misconfigured — see the comment in `bootstrap/app.php`. Then `php artisan config:cache`. |
 | **Emails not sending** | Check SMTP credentials; `MAIL_EHLO_DOMAIN` must be your domain, not `localhost`. Lead-submission emails send inline (not queued), so a failure here shows in `storage/logs` |
 | **Queued jobs not processing** | Check the Supervisor worker: `sudo supervisorctl status forefront-worker:*`. Restart if crashed/FATAL: `sudo supervisorctl restart forefront-worker:*` (the `:*` is required) |
-| **Sitemap not reflecting a content change** | `SitemapController::xml()` self-heals based on a 24h cache timestamp, not content freshness — hit `/clear-cache` to force a check, or wait for the daily `sitemap:generate` cron |
+| **Sitemap not reflecting a content change** | `SitemapController::xml()` self-heals based on a 24h cache timestamp, not content freshness — hit `/clear-cache` to force a check, or wait for the daily `sitemap:generate` cron. If it stays stale even after that, check `storage/logs/laravel-<date>.log` for `Failed to generate sitemap` — usually the file-permission issue below, failing silently |
+| **`Failed to generate sitemap` / any `Permission denied` writing to `storage`/`bootstrap/cache`/`public`** | See "File permissions & the `deploy`/`www-data` split" below |
 | **Maintenance mode stuck** | Delete `/var/www/forefront/storage/framework/maintenance.php` |
 
 ---
@@ -192,3 +193,43 @@ no cache/session tables migrated. Keep `CLEAR_CACHE_TOKEN` secret.
   memory_limit        = 256M
   max_execution_time  = 90
   ```
+
+---
+
+## File permissions & the `deploy`/`www-data` split
+
+`git checkout -f` (the `deploy` user) and PHP-FPM (`www-data`) both write into
+`storage/`, `bootstrap/cache/`, and `public/` — deploys create/update files as
+`deploy`, requests create/update files (sitemap.xml, uploads, logs) as
+`www-data`. Without deliberate setup, whichever user *didn't* create a file
+can't overwrite it later, causing `Permission denied` failures that are easy
+to mistake for something else (a stale sitemap that silently won't
+regenerate is the recurring symptom — `SitemapService::generate()` catches
+the exception and just logs it, so nothing crashes, it just quietly stops
+updating).
+
+**One-time setup** (already done on the current VPS — reapply if provisioning
+a new box, or if a fresh `git checkout` ever recreates these dirs from
+scratch):
+```bash
+sudo usermod -aG www-data deploy
+sudo chgrp -R www-data /var/www/forefront/storage /var/www/forefront/bootstrap/cache /var/www/forefront/public
+sudo chmod -R g+w /var/www/forefront/storage /var/www/forefront/bootstrap/cache /var/www/forefront/public
+sudo find /var/www/forefront/storage /var/www/forefront/bootstrap/cache /var/www/forefront/public -type d -exec chmod g+s {} \;
+```
+`chgrp`/`chmod` alone only fix files that already exist — every *new* file
+PHP-FPM creates afterward still gets whatever its process umask dictates
+(typically `644`, no group-write), silently reintroducing the same failure.
+`php_admin_value[umask]` in the FPM pool config does **not** work — `umask`
+isn't a real PHP ini directive, so FPM accepts the line without error but it
+has no effect. The actual fix is a systemd service override (applies to
+**all** PHP-FPM pools on the box — `erp`/`khmis` and `www` too, not just
+`forefront`, since they share one `php8.3-fpm.service`):
+```bash
+sudo mkdir -p /etc/systemd/system/php8.3-fpm.service.d
+printf "[Service]\nUMask=0002\n" | sudo tee /etc/systemd/system/php8.3-fpm.service.d/override.conf
+sudo systemctl daemon-reload
+sudo systemctl restart php8.3-fpm
+```
+Verify: `systemctl show php8.3-fpm -p UMask` should print `UMask=0002`; a
+freshly-created file under `public/`/`storage/` should be `664`, not `644`.
