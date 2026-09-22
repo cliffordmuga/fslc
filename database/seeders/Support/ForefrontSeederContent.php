@@ -47,6 +47,14 @@ final class ForefrontSeederContent
             'real-estate-platform',
             'healthcare-system',
             'education-platform',
+            // Duplicate singleton-type content (about/intro) from an even older
+            // seed than the above — getContentByType() has no tiebreak, so the
+            // lower-id legacy row silently won over the real one for SEO meta
+            // (canonical_url, title, description all derived from whichever
+            // row the query returns), while the page body rendered correctly
+            // from a different source. Found via a live 404 canonical link.
+            'about-forefront-solutions-ltd',
+            'welcome-to-creative-studio',
         ];
     }
 
