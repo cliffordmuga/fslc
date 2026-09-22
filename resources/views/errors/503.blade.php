@@ -220,7 +220,7 @@
             <div class="accent-bar"></div>
 
             <p class="desc">
-                {{ $exception?->getMessage() ?: 'We\'re performing scheduled maintenance to improve your experience. The site will be back online shortly.' }}
+                {{ ($exception ?? null)?->getMessage() ?: 'We\'re performing scheduled maintenance to improve your experience. The site will be back online shortly.' }}
             </p>
 
             <div class="info-grid">
