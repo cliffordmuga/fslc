@@ -14,6 +14,12 @@ use App\Models\Tag;
 
 use App\Models\User;
 
+use App\Services\SitemapService;
+
+use App\Support\AdminUiCache;
+
+use App\Support\ContentCache;
+
 use Database\Seeders\Support\ForefrontSeederContent;
 
 use Illuminate\Database\Seeder;
@@ -368,11 +374,33 @@ class ContentsSeeder extends Seeder
 
     {
 
-        Content::query()
+        // A mass update via the query builder bypasses ContentObserver::saved()
+        // entirely (Eloquent only fires model events for individual ->save()
+        // calls), so the usual sitemap-regen/cache-bust side effects never run.
+        // Replicate them here explicitly — otherwise legacy content silently
+        // lingers in the sitemap and cached hub pages after being unpublished.
+        $changed = Content::query()
 
             ->whereIn('slug', ForefrontSeederContent::legacySlugsToUnpublish())
 
+            ->where('status', '!=', 'draft')
+
             ->update(['status' => 'draft']);
+
+        if ($changed > 0) {
+
+            // Synchronous, not queued — a seeder run shouldn't depend on a
+            // queue worker being alive to actually take effect.
+
+            app(SitemapService::class)->generate();
+
+            ContentCache::bust();
+
+            AdminUiCache::forgetPublishedContentOptions();
+
+            AdminUiCache::forgetDashboardAndAnalytics();
+
+        }
 
     }
 
