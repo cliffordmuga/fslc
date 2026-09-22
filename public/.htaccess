@@ -16,12 +16,6 @@
     # route (/, nested slugs, static assets, 404s) still resolves correctly
     # without it.
 
-    # -------------------------------------------------------------------------
-    # SHARED HOSTING: path to the Laravel project root (outside public_html/).
-    # Uncomment and set to your actual cPanel path before uploading.
-    # -------------------------------------------------------------------------
-    # SetEnv APP_LARAVEL_PATH /home/YOUR_CPANEL_USER/fslc
-
     # Force www → non-www redirect (canonical domain is non-www; matches APP_URL / DEPLOYMENT.md)
     RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
     RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]

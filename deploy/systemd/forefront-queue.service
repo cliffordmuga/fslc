@@ -1,0 +1,23 @@
+# Persistent queue worker for the redis queue — replaces the cron-triggered
+# `queue:work --stop-when-empty` used on shared hosting. Install:
+#   sudo cp deploy/systemd/forefront-queue.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now forefront-queue
+# After any deploy that changes queued job code, restart so workers pick up
+# the new code (php artisan queue:restart works too, without a full restart):
+#   sudo systemctl restart forefront-queue
+
+[Unit]
+Description=Forefront Solutions queue worker
+After=network.target redis-server.service
+
+[Service]
+User=deploy
+Group=deploy
+WorkingDirectory=/var/www/forefront
+ExecStart=/usr/bin/php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

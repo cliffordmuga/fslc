@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
-class SharedHostingReadinessTest extends TestCase
+class InfrastructureReadinessTest extends TestCase
 {
     use RefreshDatabase;
 

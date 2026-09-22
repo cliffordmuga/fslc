@@ -9,10 +9,10 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 /*
-| Shared hosting: add to crontab — * * * * * php /path/to/artisan schedule:run
-| Processes queued mail (ContactReceived) when QUEUE_CONNECTION=database.
+| VPS: crontab still needs `* * * * * php /path/to/artisan schedule:run` for
+| the jobs below. Queue processing itself runs as a persistent worker under
+| systemd (see deploy/systemd/forefront-queue.service), not on this schedule.
 */
-Schedule::command('queue:work --stop-when-empty --max-time=45')->everyMinute()->withoutOverlapping();
 
 Schedule::command('sitemap:generate')->daily()->at('03:00');
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Laravel 12 marketing/portfolio CMS for **Forefront Solutions (K) Ltd** (forefrontsolutions.co.ke) — HMIS/digital-health consultancy positioning, an insights hub, lead capture, and an admin content manager. Blade + Alpine.js + Tailwind on the front; TinyMCE in admin. Target host is **cPanel shared hosting** (Apache, PHP 8.2/8.3), so cache, session, and queue all use the `database` driver by default.
+Laravel 12 marketing/portfolio CMS for **Forefront Solutions (K) Ltd** (forefrontsolutions.co.ke) — HMIS/digital-health consultancy positioning, an insights hub, lead capture, and an admin content manager. Blade + Alpine.js + Tailwind on the front; TinyMCE in admin. Target host is a **self-managed VPS** (Nginx, PHP-FPM 8.3, Redis) — cache, session, and queue all use the `redis` driver by default (`config/cache.php` falls back to `file`/`database` automatically if the redis extension isn't available, so `composer test`/local dev without Redis still works).
 
 ## Commands
 
@@ -46,11 +46,11 @@ php artisan forefront:generate-brand-assets
 
 `DEPLOYMENT.md` is authoritative. Key points that affect how code must behave:
 
-- The Laravel root is uploaded **above** `public_html/`; the contents of `public/` go **into** `public_html/`. `public/.htaccess` has no `RewriteBase` (Apache derives it from the physical docroot, so the same line works local or in production) — the one line that's still server-specific and must **not** be committed is `SetEnv APP_LARAVEL_PATH ...`.
+- Standard Laravel layout on the VPS — `public/` is the Nginx docroot directly (`/var/www/forefront/public`), no split-directory indirection. `public/index.php` is stock Laravel; don't reintroduce path-resolution hacks.
 - `composer deploy` runs `config:cache route:cache view:cache event:cache` + `sitemap:generate`. Anything read from `env()` outside a `config/` file will be null once config is cached — always go through `config()`.
-- No SSH assumed. Caches are cleared in production via `GET /clear-cache?token=<CLEAR_CACHE_TOKEN>`. That route is defined in `bootstrap/app.php` (not `routes/web.php`) specifically so it works with **no session/cache DB tables present**; keep it dependency-free.
-- Cron runs `php artisan schedule:run` every minute → `queue:work --stop-when-empty --max-time=45` (processes queued mail), daily `sitemap:generate`, weekly `lead-events:prune` (`routes/console.php`).
-- **`.cpanel.yml`** drives cPanel's Git Version Control deploy (the recommended path over manual uploads — see `DEPLOYMENT.md` "Git-based deploys"): copies `public/` assets into `public_html/`, `composer install --no-dev`, migrate, cache rebuild, `sitemap:generate`. Never touches `.env`/`storage/`/`vendor/` — those aren't tracked, so a `git pull` in place leaves them alone. If you change what needs to happen on deploy (a new artisan command that must run once, a new public asset path), update `.cpanel.yml` too, not just `DEPLOYMENT.md`.
+- Caches can also be cleared without SSH via `GET /clear-cache?token=<CLEAR_CACHE_TOKEN>`. That route is defined in `bootstrap/app.php` (not `routes/web.php`) specifically so it works with **no session/cache DB tables present**; keep it dependency-free.
+- Cron runs `php artisan schedule:run` every minute for scheduled *jobs* (daily `sitemap:generate`, weekly `lead-events:prune`, hourly `cache:prune-stale`) — see `routes/console.php`. Queue *processing* is a separate, persistent `queue:work redis` worker under systemd (`deploy/systemd/forefront-queue.service`), not cron-triggered; restart it (`systemctl restart forefront-queue` or `php artisan queue:restart`) after any deploy that changes queued job code.
+- **Deploy**: `scripts/sync-production.sh` commits + pushes to a `production` git remote (bare repo on the VPS); a server-side `post-receive` hook does a delta `git checkout -f`, `composer install --no-dev`, conditional asset rebuild, `migrate --force`, cache rebuild, and a queue-worker restart, wrapped in maintenance mode. `deploy/nginx/forefront.conf` and `deploy/systemd/forefront-queue.service` are reference configs for the server side, not auto-applied by the deploy script.
 
 ## Architecture
 
@@ -83,7 +83,7 @@ Tags (`content_tag` pivot) are edited from the content create/edit forms via the
 | Layer | Where | Invalidation |
 |---|---|---|
 | Full-page HTML | `PublicPageCache` middleware | TTL (`public_page_cache.ttl_seconds`, default 120s) + global buster. Key = `md5(buster \| locale \| device \| path \| allow-listed sorted query)`. Skips authenticated users, admin/auth/form/api paths. `?nocache=1` bypasses. Adds `X-Page-Cache: HIT/MISS/SKIP/BYPASS`. |
-| Query/fragment cache | `ContentService` via `ContentCacheManager` | Tag-based (only on redis/memcached — degrades to plain keys on the database driver) + `cacheVersion()` + content buster. |
+| Query/fragment cache | `ContentService` via `ContentCacheManager` | Tag-based (active now that `CACHE_STORE=redis`; degrades to plain keys if the store falls back to `database`/`file`) + `cacheVersion()` + content buster. |
 | Model cache keys/tags | `Cacheable` trait | `saved`/`deleted` model events call `getCacheKeys()` / `getCacheTags()`. Pattern clearing is redis-only and off by default. |
 | SEO fields | `Seoable` trait | Per-model `seo:<class>:<id>:*` keys, busted on `saved`/`deleted`. |
 | Admin sidebar / dashboard | `App\Support\AdminUiCache` | Explicit `forget*` calls from observers. |
