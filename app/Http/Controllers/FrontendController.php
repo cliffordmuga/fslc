@@ -19,7 +19,7 @@ class FrontendController extends Controller
         if (config('app.debug')) {
             Log::debug('FrontendController@index hit', [
                 'path' => request()->path(),
-                'url'  => request()->fullUrl(),
+                'url' => request()->fullUrl(),
             ]);
         }
 
@@ -50,10 +50,10 @@ class FrontendController extends Controller
 
     public function about()
     {
-        $about   = $this->contentService->getContentByType('about', true);
+        $about = $this->contentService->getContentByType('about', true);
         $mission = $this->contentService->getContentByType('mission', false);
-        $vision  = $this->contentService->getContentByType('vision', false);
-        $intro   = $this->contentService->getContentByType('intro', false);
+        $vision = $this->contentService->getContentByType('vision', false);
+        $intro = $this->contentService->getContentByType('intro', false);
 
         $aboutCta = $this->contentService->getCtaForPage('about');
         $timelineItems = $this->contentService->getTimelineItems();
@@ -110,8 +110,6 @@ class FrontendController extends Controller
         ));
     }
 
-
-
     public function services()
     {
         $services = $this->contentService->getPublishedContentsCollection('services', true);
@@ -124,8 +122,6 @@ class FrontendController extends Controller
 
         return view('frontend.services', compact('services', 'seoData', 'pageSchemas', 'servicesCta', 'positioning'));
     }
-
-
 
     public function blog(Request $request)
     {
@@ -164,13 +160,12 @@ class FrontendController extends Controller
         ));
     }
 
-
-
     public function mission()
     {
-        $content = $this->contentService->getContentWithRelations('mission', 'mission');
+        $content = $this->contentService->getSingletonWithRelations('mission');
         $seoData = $this->contentService->getSeoData('mission', $content);
         $pageSchemas = $this->contentService->getPageSchemas('details', ['content' => $content]);
+
         return view('frontend.details', [
             'content' => $content,
             'seoData' => $seoData,
@@ -182,9 +177,10 @@ class FrontendController extends Controller
 
     public function vision()
     {
-        $content = $this->contentService->getContentWithRelations('vision', 'vision');
+        $content = $this->contentService->getSingletonWithRelations('vision');
         $seoData = $this->contentService->getSeoData('vision', $content);
         $pageSchemas = $this->contentService->getPageSchemas('details', ['content' => $content]);
+
         return view('frontend.details', [
             'content' => $content,
             'seoData' => $seoData,
@@ -196,9 +192,10 @@ class FrontendController extends Controller
 
     public function intro()
     {
-        $content = $this->contentService->getContentWithRelations('intro', 'intro');
+        $content = $this->contentService->getSingletonWithRelations('intro');
         $seoData = $this->contentService->getSeoData('intro', $content);
         $pageSchemas = $this->contentService->getPageSchemas('details', ['content' => $content]);
+
         return view('frontend.details', [
             'content' => $content,
             'seoData' => $seoData,
@@ -210,15 +207,15 @@ class FrontendController extends Controller
 
     public function tag(string $slug)
     {
-        $tag  = Tag::where('slug', $slug)->firstOrFail();
+        $tag = Tag::where('slug', $slug)->firstOrFail();
         $type = request()->query('type', 'all');
 
         $items = $this->contentService->getTagPageContent($tag, $type, 12);
 
-        $tagCta      = $this->contentService->getCtaForPage('home');
-        $seoData     = $this->contentService->getTagSeoData($tag);
+        $tagCta = $this->contentService->getCtaForPage('home');
+        $seoData = $this->contentService->getTagSeoData($tag);
         $pageSchemas = $this->contentService->getPageSchemas('tag', ['tag' => $tag]);
-        $tagIntro    = $tag->hub_intro ?: (config("forefront.tag_hub_intros.{$tag->slug}") ?? null);
+        $tagIntro = $tag->hub_intro ?: (config("forefront.tag_hub_intros.{$tag->slug}") ?? null);
 
         return view('frontend.tag', compact('tag', 'items', 'type', 'tagCta', 'seoData', 'pageSchemas', 'tagIntro'));
     }
@@ -256,19 +253,16 @@ class FrontendController extends Controller
         ]);
     }
 
-
-
-
     public function show(string $slug)
     {
         $routeName = request()->route()?->getName();
 
         $type = match ($routeName) {
             'portfolio.show' => 'portfolio',
-            'services.show'  => 'services',
+            'services.show' => 'services',
             'insights.show', 'blog.show' => 'blog',
-            'page.show'      => 'page',
-            default          => abort(404),
+            'page.show' => 'page',
+            default => abort(404),
         };
 
         $content = $this->contentService->getContentWithRelations($type, $slug);
@@ -299,7 +293,7 @@ class FrontendController extends Controller
         View::share('inquiryType', $detailInquiryType);
 
         // Preload hero image for better LCP (cPanel-friendly, no extra infra)
-        if (!isset($seoData['preload_image'])) {
+        if (! isset($seoData['preload_image'])) {
             $featured = $content->images?->where('collection', 'featured')->first();
             $seoData['preload_image'] = $featured?->image_url ?? $seoData['og_image'] ?? null;
         }

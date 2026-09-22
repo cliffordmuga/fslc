@@ -439,6 +439,50 @@ class ContentService
         }, ["content:{$type}"]);
     }
 
+    /**
+     * Load the published singleton for a content type (mission / vision / intro / about)
+     * with the same relation profile as detail pages. Slug is not required — admins may
+     * rename it without breaking /mission, /vision, /intro routes.
+     */
+    public function getSingletonWithRelations(string $type): Content
+    {
+        $variant = $this->imageVariantForDetail();
+
+        $key = $this->makeCacheKey('singleton_detail', [
+            'type' => $type,
+            'variant' => $variant,
+            'img_profile' => 'gallery_tsm_v1',
+        ]);
+
+        return $this->remember($key, now()->addMinutes(30), function () use ($type, $variant) {
+            return Content::query()
+                ->with([
+                    'tags',
+                    'ctas',
+                    'seoMetadata',
+                    'testimonials',
+                    'creator',
+                    'images' => fn ($q) => $q
+                        ->select(['id', 'image_url', 'alt_text', 'imageable_id', 'imageable_type', 'variant', 'collection', 'order'])
+                        ->where(function ($w) use ($variant) {
+                            $w->where(function ($q) use ($variant) {
+                                $q->where('collection', '!=', 'gallery')
+                                    ->where('variant', $variant);
+                            })->orWhere(function ($q) {
+                                $q->where('collection', 'gallery')
+                                    ->whereIn('variant', ['thumbnail', 'small', 'main']);
+                            });
+                        })
+                        ->orderBy('order')
+                        ->orderBy('id'),
+                ])
+                ->published()
+                ->where('type', $type)
+                ->ordered()
+                ->firstOrFail();
+        }, ["content:{$type}"]);
+    }
+
     public function getSeoData(string $page, ?Content $content = null): array
     {
         return $this->pageSeo->getSeoData($page, $content);

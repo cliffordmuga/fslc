@@ -15,16 +15,24 @@ class HandleRedirects
     public function handle(Request $request, Closure $next): Response
     {
         // Redirects should only apply to public page loads
-        if (!in_array($request->method(), ['GET', 'HEAD'], true)) {
+        if (! in_array($request->method(), ['GET', 'HEAD'], true)) {
             return $next($request);
         }
 
-        // If the redirects table isn't migrated yet, skip safely
-        if (!Schema::hasTable('redirects')) {
+        // Skip safely when DB is missing/unmigrated (shared hosting / local setup gaps)
+        try {
+            if (! Schema::hasTable('redirects')) {
+                return $next($request);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('HandleRedirects skipped: database unavailable', [
+                'error' => $e->getMessage(),
+            ]);
+
             return $next($request);
         }
 
-        $path = '/' . ltrim($request->path(), '/');
+        $path = '/'.ltrim($request->path(), '/');
         $normalized = rtrim($path, '/');
         if ($normalized === '') {
             $normalized = '/';
@@ -40,7 +48,7 @@ class HandleRedirects
         }
 
         $redirect = Cache::remember(
-            'redirect:path:' . md5($normalized),
+            'redirect:path:'.md5($normalized),
             now()->addHour(),
             fn () => Redirect::query()
                 ->where('is_active', true)
@@ -48,7 +56,7 @@ class HandleRedirects
                 ->first()
         );
 
-        if (!$redirect) {
+        if (! $redirect) {
             return $next($request);
         }
 
@@ -57,7 +65,7 @@ class HandleRedirects
         // Preserve query string
         $qs = $request->getQueryString();
         if ($qs) {
-            $target .= (str_contains($target, '?') ? '&' : '?') . $qs;
+            $target .= (str_contains($target, '?') ? '&' : '?').$qs;
         }
 
         // Prevent loops: don't redirect to same path (ignoring query string)
@@ -67,7 +75,7 @@ class HandleRedirects
 
         // Validate status
         $status = (int) ($redirect->status_code ?? 301);
-        if (!in_array($status, [301, 302, 307, 308], true)) {
+        if (! in_array($status, [301, 302, 307, 308], true)) {
             $status = 301;
         }
 
@@ -94,8 +102,9 @@ class HandleRedirects
         }
 
         // Normalize relative paths
-        $t = '/' . ltrim($target, '/');
+        $t = '/'.ltrim($target, '/');
         $t = rtrim($t, '/');
+
         return $t === '' ? '/' : $t;
     }
 
@@ -105,13 +114,15 @@ class HandleRedirects
         if (preg_match('#^https?://#i', $target)) {
             $parts = parse_url($target);
             $p = $parts['path'] ?? '/';
-            $p = '/' . ltrim($p, '/');
+            $p = '/'.ltrim($p, '/');
             $p = rtrim($p, '/');
+
             return $p === '' ? '/' : $p;
         }
 
-        $p = '/' . ltrim($target, '/');
+        $p = '/'.ltrim($target, '/');
         $p = rtrim($p, '/');
+
         return $p === '' ? '/' : $p;
     }
 }
