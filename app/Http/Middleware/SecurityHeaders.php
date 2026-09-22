@@ -57,7 +57,11 @@ class SecurityHeaders
             "img-src 'self' data: https:",
             "font-src 'self' data: https:",
             "style-src 'self' 'unsafe-inline' https:",
-            "script-src 'self' 'unsafe-inline' https:",
+            // 'unsafe-eval' required by Alpine.js (resources/js/app.js), which
+            // evaluates x-data/x-on expressions via new Function() internally —
+            // switching to @alpinejs/csp instead would need every Blade
+            // x-data usage migrated to named Alpine.data() registrations.
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
             "connect-src 'self' https:",
             "frame-src 'self' https://www.google.com https://www.google.com/maps https://maps.google.com",
             "object-src 'none'",
